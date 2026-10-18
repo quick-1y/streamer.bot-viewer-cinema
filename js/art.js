@@ -75,6 +75,11 @@
       [770, 1159, 228, 270]
     ]
   ];
+  // Leg geometry per atlas row in pose-canvas pixels: [front split between the
+  // feet, centre of the back-view legs]. Measured offline from the PNGs, because
+  // reading pixels back is forbidden when the overlay runs from file:// (OBS).
+  const legs = [[41, 40], [40, 40], [40, 41], [40, 41]];
+  const extraLegs = [[43, 39.5], [41, 40], [43, 39.5], [42, 40.5]];
   function canvas(w, h) {
     const c = document.createElement('canvas');
     c.width = w;
@@ -298,18 +303,10 @@
   // foot swung sideways, alternating so one foot reaches forward (down-left on
   // screen, the SW walking direction) while the other lifts behind.
   const HIP = 90;
-  function stride(c, frame) {
+  function stride(c, frame, split) {
     const ctx = c.getContext('2d');
-    const legs = ctx.getImageData(0, HIP, 80, 128 - HIP);
-    // Split between the feet where the lowest rows hold the least paint.
-    let split = 40, least = Infinity;
-    for (let x = 28; x <= 52; x++) {
-      let sum = 0;
-      for (let y = legs.height - 18; y < legs.height - 2; y++) sum += legs.data[(y * 80 + x) * 4 + 3];
-      if (sum < least) { least = sum; split = x; }
-    }
     const band = canvas(80, 128 - HIP);
-    band.getContext('2d').putImageData(legs, 0, 0);
+    band.getContext('2d').drawImage(c, 0, HIP, 80, 128 - HIP, 0, 0, 80, 128 - HIP);
     ctx.clearRect(0, HIP, 80, 128 - HIP);
     // frame 1: left leg forward, 2: passing, 3: right leg forward, 4: passing
     const reach = [0, 8, 2, -8, -2][frame];
@@ -333,16 +330,11 @@
   // The back view is painted mid-stride. Frame 1 keeps it, frame 3 mirrors the
   // legs about their own centre (the other foot forward) and frames 2/4 draw
   // them drawn together as the feet pass each other.
-  function gait(c, frame) {
+  function gait(c, frame, mid) {
     if (frame === 1) return;
     const ctx = c.getContext('2d'), h = 128 - HIP;
-    const legs = ctx.getImageData(0, HIP, 80, h);
-    let x0 = 80, x1 = 0;
-    for (let y = 0; y < h; y++) for (let x = 0; x < 80; x++)
-      if (legs.data[(y * 80 + x) * 4 + 3] > 40) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
-    if (x1 <= x0) return;
-    const band = canvas(80, h), mid = (x0 + x1 + 1) / 2;
-    band.getContext('2d').putImageData(legs, 0, 0);
+    const band = canvas(80, h);
+    band.getContext('2d').drawImage(c, 0, HIP, 80, h, 0, 0, 80, h);
     ctx.clearRect(0, HIP, 80, h);
     ctx.save();
     // Stretch from the hip so the waist stays joined to the jacket.
@@ -361,6 +353,7 @@
     const row = hash % 4,
       atlasCrops = (hash >>> 2) % 2 ? extraCrops : crops,
       atlas = (hash >>> 2) % 2 ? A.images.viewersExtra : A.images.viewers,
+      leg = ((hash >>> 2) % 2 ? extraLegs : legs)[row],
       scale = 116 / atlasCrops[row][0][3];
     function pose(col, frame = 0) {
       const c = canvas(80, 128),
@@ -372,8 +365,8 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(atlas, x, y, w, h, (80 - dw) / 2, 124 - dh + bob, dw, dh);
-      if (col === 0 && frame) stride(c, frame);
-      else if (col === 1 && frame) gait(c, frame);
+      if (col === 0 && frame) stride(c, frame, leg[0]);
+      else if (col === 1 && frame) gait(c, frame, leg[1]);
       // Stable, restrained wardrobe variations; face and hair retain their artwork.
       const hue = [-18, 0, 18, 36][(hash >>> 4) % 4];
       if (hue) {
