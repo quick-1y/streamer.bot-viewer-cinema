@@ -5,6 +5,7 @@
   const A = (VC.Art = { images: {}, ready: null, available: false });
   const sources = {
     room: 'assets/art/cinema-room.png',
+    floor: 'assets/art/cinema-floor.png',
     chair: 'assets/art/cinema-chair.png',
     viewers: 'assets/art/viewers.png',
     viewersExtra: 'assets/art/viewers-extra.png'
@@ -80,6 +81,47 @@
     c.height = h;
     return c;
   }
+  // Resample the existing woven artwork onto exact world rectangles once.
+  // The clean floor is used only beneath the old rug footprints; the room,
+  // facade, lettering and lighting outside those footprints remain original.
+  A.floor = function (ctx) {
+    const L = VC.Layout;
+    ctx.save();
+    ctx.translate(24, 12);
+    ctx.scale(1872 / 1672, 1054 / 941);
+    function path(points) {
+      ctx.beginPath();
+      points.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
+      ctx.closePath();
+    }
+    for (const rug of L.RUGS) {
+      const center = rug.source.reduce((p,q) => [p[0]+q[0]/4,p[1]+q[1]/4],[0,0]);
+      ctx.save();
+      path(rug.source.map(p => p.map((v,i) => center[i]+(v-center[i])*1.025)));
+      ctx.clip();
+      ctx.drawImage(A.images.floor,0,0,1672,941);
+      ctx.restore();
+    }
+    function triangle(source, target) {
+      const [s,p,q] = source, [t,u,v] = target;
+      const px=p[0]-s[0], py=p[1]-s[1], qx=q[0]-s[0], qy=q[1]-s[1];
+      const ux=u[0]-t[0], uy=u[1]-t[1], vx=v[0]-t[0], vy=v[1]-t[1];
+      const det=px*qy-py*qx;
+      const a=(ux*qy-vx*py)/det, c=(vx*px-ux*qx)/det;
+      const b=(uy*qy-vy*py)/det, d=(vy*px-uy*qx)/det;
+      ctx.save();
+      path(target); ctx.clip();
+      ctx.transform(a,b,c,d,t[0]-a*s[0]-c*s[1],t[1]-b*s[0]-d*s[1]);
+      ctx.drawImage(A.images.room,0,0);
+      ctx.restore();
+    }
+    for (const rug of L.RUGS) {
+      const target=L.rugCorners(rug);
+      for (const ids of [[0,1,2],[0,2,3]])
+        triangle(ids.map(i=>rug.source[i]),ids.map(i=>target[i]));
+    }
+    ctx.restore();
+  };
   A.scene = function () {
     const L = VC.Layout,
       bg = canvas(1920, 1080),
@@ -92,6 +134,7 @@
     ctx.filter = 'brightness(.9) saturate(.94)';
     // Preserve the original fine detail: no low-resolution intermediate canvas.
     ctx.drawImage(A.images.room, 24, 12, 1872, 1054);
+    A.floor(ctx);
     const F = L.artPoint;
     function polygon(context, points) {
       points.forEach(([x, y], i) => {

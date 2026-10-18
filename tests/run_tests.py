@@ -370,8 +370,30 @@ def main():
             });
         }""")
         check('15. all six chair rows are straight and aligned with the painted floor',
-              len(geometry)==6 and all(31.5 < r['angle'] < 32.5 and r['deviation'] < .65 for r in geometry),
+              len(geometry)==6 and all(28.0 < r['angle'] < 28.6 and r['deviation'] < .65 for r in geometry),
               json.dumps(geometry))
+        plane = pg.evaluate("""() => {
+            const L=VC.Layout, parallel=(a,b,axis)=>{
+                const dx=b[0]-a[0],dy=b[1]-a[1];
+                return Math.abs(dx*axis[1]-dy*axis[0])/Math.hypot(dx,dy)/Math.hypot(...axis)<1e-10;
+            };
+            const x=[639,344],y=[-645,313],g=L.ART_GEOMETRY;
+            const rugs=L.RUGS.every(r=>{
+                const c=L.rugCorners(r);
+                return parallel(c[0],c[1],x)&&parallel(c[3],c[2],x)&&
+                    parallel(c[0],c[3],y)&&parallel(c[1],c[2],y);
+            });
+            const rails=parallel(...g.railFront,x)&&parallel(...g.railRight,y);
+            const gaps=__cinema.renderer.seatItems.filter(p=>p.kind==='back').map(p=>{
+                const sx=(p.sx-12)*1672/936-879,sy=(p.sy-6)*941/527-274;
+                return (639*sy-344*sx)/Math.hypot(639,344);
+            });
+            return {rugs,rails,gap:Math.min(...gaps)};
+        }""")
+        check('15b. all four rug edges and both fence runs follow the surveyed floor axes',
+              plane['rugs'] and plane['rails'],json.dumps(plane))
+        check('15c. first chair row has at least 130 source pixels of perpendicular screen-wall clearance',
+              plane['gap']>=130,json.dumps(plane))
         masks = pg.evaluate("""() => {
             const scene=__cinema.renderer.scene, fg=scene.fg.getContext('2d'), header=scene.lintel.getContext('2d');
             const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(x,y);return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
@@ -384,7 +406,7 @@ def main():
             VC.Art.railings(ctx);
             const source=caps.map(([x,y])=>[(x+.5-12)*1672/936,(y+.6+1.04*VC.Layout.ZS-6)*941/527]);
             return {count:caps.length,unique:new Set(caps.map(p=>p.map(v=>v.toFixed(4)).join(','))).size,
-                minX:Math.min(...source.map(p=>p[0])),corner:source.filter(p=>Math.hypot(p[0]-855,p[1]-914)<1).length};
+                minX:Math.min(...source.map(p=>p[0])),corner:source.filter(p=>Math.hypot(p[0]-874.19905956,p[1]-922.15943922)<1).length};
         }""")
         check('16b. fence starts beyond entrance wall and has one shared corner post',
               rails['count']==rails['unique'] and rails['minX']>545 and rails['corner']==1, json.dumps(rails))

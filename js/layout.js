@@ -33,7 +33,7 @@
     DOOR_X0: 1.2,
     DOOR_X1: 3.5,
     DOOR_H: 3.0,
-    ROWS: [4.2, 6.3, 8.4, 10.5, 12.6, 14.7],
+    ROWS: [4.1, 6.1, 8.1, 10.7, 12.7, 14.7],
     BLOCKS: [
       { x0: 2.65, n: 5 },
       { x0: 11.0, n: 5 }
@@ -42,8 +42,17 @@
     WALK_OFFSET: 0.6 // walkway lies this far in front of a seat (toward the screen)
   };
 
+  // Three surveyed floor corners define one affine plane. Every floor object
+  // uses these two basis vectors, so parallel world edges stay parallel on screen.
+  L.FLOOR = { origin: [879, 274], x: [639, 344], y: [-645, 313] };
+  L.floorArt = function (x, y) {
+    const f = L.FLOOR;
+    return [f.origin[0] + x / L.W * f.x[0] + y / L.D * f.y[0],
+      f.origin[1] + x / L.W * f.x[1] + y / L.D * f.y[1]];
+  };
   L.project = function (x, y, z = 0) {
-    return { x: L.OX + x * 18.55 - y * 21.274, y: L.OY + x * 10.04 + y * 9.751 - z * L.ZS };
+    const p = L.artPoint(...L.floorArt(x, y));
+    return { x: p.x, y: p.y - z * L.ZS };
   };
 
   // All overlay geometry is measured in the unmodified room artwork.
@@ -51,12 +60,19 @@
     return { x: 12 + (x * 936) / 1672, y: 6 + (y * 527) / 941 };
   };
   L.fromArt = function (x, y) {
-    const p = L.artPoint(x, y),
-      sx = p.x - L.OX,
-      sy = p.y - L.OY;
-    const det = 18.55 * 9.751 + 21.274 * 10.04;
-    return { x: (sx * 9.751 + sy * 21.274) / det, y: (sy * 18.55 - sx * 10.04) / det };
+    const f = L.FLOOR, sx = x - f.origin[0], sy = y - f.origin[1];
+    const det = f.x[0] * f.y[1] - f.x[1] * f.y[0];
+    return { x: (sx * f.y[1] - sy * f.y[0]) / det * L.W,
+      y: (sy * f.x[0] - sx * f.x[1]) / det * L.D };
   };
+  L.RUGS = [
+    { x0: 1.6, x1: 18.3, y0: 3.2, y1: 8.6,
+      source: [[883,299],[1403,618],[1176,733],[653,410]] },
+    { x0: 1.6, x1: 18.3, y0: 9.7, y1: 15.5,
+      source: [[596,426],[1118,751],[899,862],[395,520]] }
+  ];
+  L.rugCorners = (r) => [[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]]
+    .map(([x,y]) => L.floorArt(x,y));
   L.ART_GEOMETRY = {
     gateLeft: [269, 641],
     gateRight: [373, 700],
@@ -85,14 +101,8 @@
       [269, 544],
       [224, 516]
     ],
-    railFront: [
-      [555, 752],
-      [855, 914]
-    ],
-    railRight: [
-      [1506, 621],
-      [855, 914]
-    ]
+    railFront: [L.floorArt(9.7, 17.15), L.floorArt(19.55, 17.15)],
+    railRight: [L.floorArt(19.55, .8), L.floorArt(19.55, 17.15)]
   };
 
   L.artContains = function (polygon, point) {
@@ -112,17 +122,10 @@
     L.artContains(L.ART_GEOMETRY.lintel, point) ||
     (L.artContains(L.ART_GEOMETRY.facade, point) && !L.artContains(L.ART_GEOMETRY.opening, point));
 
-  // Seat rows follow the painted carpet axes, rather than the approximate
-  // perimeter projection. Both seating blocks share one straight row direction.
+  // Seats share the same plane as the rugs and railings. The first row is
+  // 4.1 tiles from the screen wall; the carpet starts 3.2 tiles from it.
   L.seatPoint = function (row, nominalX, forward = 0) {
-    const rear = row < 3;
-    const origin = rear ? { x: 883, y: 299 } : { x: 596, y: 426 };
-    const depth = rear ? { x: -231, y: 108 } : { x: -200, y: 96 };
-    const u = 0.08 + ((nominalX - 2.65) / (17 - 2.65)) * 0.84;
-    const v = 0.16 + (row % 3) * 0.34 - (forward / 2.1) * 0.34;
-    const artX = origin.x + u * 522 + v * depth.x;
-    const artY = origin.y + u * 325 + v * depth.y;
-    return L.fromArt(artX, artY);
+    return { x: nominalX, y: L.ROWS[row] - forward };
   };
 
   const gateLeft = L.fromArt(...L.ART_GEOMETRY.gateLeft);
