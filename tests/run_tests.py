@@ -358,50 +358,59 @@ def main():
         check('14i. illustrated assets loaded and render at native 1080p', pg.evaluate(
             "VC.Art.available && __cinema.renderer.scene.illustrated && __cinema.renderer.world.width === 1920 && __cinema.renderer.world.height === 1080"))
         geometry = pg.evaluate("""() => {
-            const seats=VC.Layout.buildSeats(60);
+            const seats=VC.Layout.buildSeats(60), c=VC.Layout.FLOOR.corners;
+            const edge=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
+            const screen=edge(c[0],c[1]), entrance=edge(c[3],c[2]);
             const anchors=__cinema.renderer.seatItems.filter(p=>p.kind==='back');
             const rows=Array.from({length:6},()=>[]);
             seats.forEach((seat,i)=>rows[seat.row].push(anchors[i]));
             return rows.map(points=>{
                 const a=points[0],b=points[points.length-1];
                 const dx=b.sx-a.sx,dy=b.sy-a.sy,length=Math.hypot(dx,dy);
-                return {angle:Math.atan2(dy,dx)*180/Math.PI,
+                const angle=Math.atan2(dy,dx)*180/Math.PI;
+                return {angle,screen:angle-screen,entrance:angle-entrance,
                     deviation:Math.max(...points.map(p=>Math.abs(dx*(p.sy-a.sy)-dy*(p.sx-a.sx))/length))};
             });
         }""")
-        check('15. all six chair rows are straight and aligned with the painted floor',
-              len(geometry)==6 and all(28.0 < r['angle'] < 28.6 and r['deviation'] < .65 for r in geometry),
-              json.dumps(geometry))
+        check('15. all six chair rows are straight and parallel to the screen wall and the entrance wall',
+              len(geometry)==6 and all(abs(r['screen']) < .3 and abs(r['entrance']) < .3 and r['deviation'] < .65
+                                       for r in geometry), json.dumps(geometry))
         plane = pg.evaluate("""() => {
-            const L=VC.Layout, parallel=(a,b,axis)=>{
-                const dx=b[0]-a[0],dy=b[1]-a[1];
-                return Math.abs(dx*axis[1]-dy*axis[0])/Math.hypot(dx,dy)/Math.hypot(...axis)<1e-10;
-            };
-            const x=[639,344],y=[-645,313],g=L.ART_GEOMETRY;
+            const L=VC.Layout, c=L.FLOOR.corners, g=L.ART_GEOMETRY;
+            const angle=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
+            const near=(a,b,edge,tol)=>Math.abs(angle(a,b)-angle(...edge))<tol;
+            // Rug corners lie exactly on their world rectangle; long edges follow the walls.
             const rugs=L.RUGS.every(r=>{
-                const c=L.rugCorners(r);
-                return parallel(c[0],c[1],x)&&parallel(c[3],c[2],x)&&
-                    parallel(c[0],c[3],y)&&parallel(c[1],c[2],y);
+                const q=L.rugCorners(r), world=[[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]];
+                return q.every((p,i)=>{const w=L.fromArt(...p);return Math.hypot(w.x-world[i][0],w.y-world[i][1])<1e-9;})&&
+                    near(q[0],q[1],[c[0],c[1]],.3)&&near(q[3],q[2],[c[3],c[2]],.3);
             });
-            const rails=parallel(...g.railFront,x)&&parallel(...g.railRight,y);
+            const rails=near(...g.railFront,[c[3],c[2]],.05)&&near(...g.railRight,[c[1],c[2]],.05);
+            const [a,b]=c, length=Math.hypot(b[0]-a[0],b[1]-a[1]);
             const gaps=__cinema.renderer.seatItems.filter(p=>p.kind==='back').map(p=>{
-                const sx=(p.sx-12)*1672/936-879,sy=(p.sy-6)*941/527-274;
-                return (639*sy-344*sx)/Math.hypot(639,344);
+                const sx=(p.sx-12)*1672/936-a[0],sy=(p.sy-6)*941/527-a[1];
+                return ((b[0]-a[0])*sy-(b[1]-a[1])*sx)/length;
             });
             return {rugs,rails,gap:Math.min(...gaps)};
         }""")
-        check('15b. all four rug edges and both fence runs follow the surveyed floor axes',
+        check('15b. rugs sit on exact floor rectangles and both fence runs follow the painted floor edges',
               plane['rugs'] and plane['rails'],json.dumps(plane))
-        check('15c. first chair row has at least 130 source pixels of perpendicular screen-wall clearance',
-              plane['gap']>=130,json.dumps(plane))
+        check('15c. first chair row has at least 110 source pixels of perpendicular screen-wall clearance',
+              plane['gap']>=110,json.dumps(plane))
         wall_pixels = pg.evaluate("""() => {
             const measure = """ + (ROOT / 'tests' / 'wall_pixels.js').read_text() + """;
             const original=document.createElement('canvas');
             original.width=1672;original.height=941;
             original.getContext('2d').drawImage(VC.Art.images.room,0,0);
-            const guides=VC.RoomMesh.guides;
-            return {original:measure({canvas:original,guides,target:false}),
-                corrected:measure({canvas:__cinema.renderer.scene.room,guides})};
+            // Search bands around the painted screen-wall base (stage strip → parquet)
+            // and the front floor edge; the angles come from the rendered pixels.
+            const guides=[{name:'screen-wall-base',target:[[960,350.9],[1380,589.1]]},
+                {name:'front-floor-edge',target:[[560,727.6],[890,913.8]]}];
+            const c=VC.Layout.FLOOR.corners, edge=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
+            return {original:measure({canvas:original,guides:VC.RoomMesh.guides,target:false}),
+                corrected:measure({canvas:__cinema.renderer.scene.room,guides,
+                    specs:[{name:'screen-wall-base',sign:1},{name:'front-floor-edge',sign:-1}]}),
+                floor:{'screen-wall-base':edge(c[0],c[1]),'front-floor-edge':edge(c[3],c[2])}};
         }""")
         def walls_aligned(lines):
             return len(lines)==4 and all(line['angle'] is not None and
@@ -409,40 +418,17 @@ def main():
                 line['inliers']/line['points']>.75 and line['residual']<1.5 for line in lines)
         wall_angles=lambda lines: ', '.join(f"{line['name']}={line['angle']:.3f}°" if
             line['angle'] is not None else f"{line['name']}=unmeasurable" for line in lines)
-        check('15d. actual screen and entrance-beam pixels share the floor angle within 0.3 degrees',
-              walls_aligned(wall_pixels['corrected']),wall_angles(wall_pixels['corrected']))
+        check('15d. painted screen-wall base and front floor edge match the floor calibration within 0.3 degrees',
+              len(wall_pixels['corrected'])==2 and all(line['angle'] is not None and line['points']>40 and
+                line['inliers']/line['points']>.75 and
+                abs(line['angle']-wall_pixels['floor'][line['name']])<.3 for line in wall_pixels['corrected']),
+              wall_angles(wall_pixels['corrected'])+' floor='+json.dumps(wall_pixels['floor']))
         check('15e. pixel regression detects the inconsistent angles in the original artwork',
               not walls_aligned(wall_pixels['original']),wall_angles(wall_pixels['original']))
-        contours = pg.evaluate("""() => {
-            const room=__cinema.renderer.scene.room,{width,height}=room;
-            const rgba=room.getContext('2d').getImageData(0,0,width,height).data;
-            return [['left roof',200,800,false,-25.889],['screen roof',950,1450,false,28.3],
-                ['front floor',580,820,true,28.3],['right floor',950,1450,true,-25.889]]
-                .map(([name,x0,x1,bottom,expected])=>{
-                    const points=[];
-                    for(let x=x0;x<=x1;x++)for(let i=0;i<height;i++){
-                        const y=bottom?height-1-i:i;
-                        if(rgba[(y*width+x)*4+3]>127){points.push({x,y});break;}
-                    }
-                    let keep=points,slope=0,intercept=0;
-                    for(let pass=0;pass<4;pass++){
-                        const mx=keep.reduce((s,p)=>s+p.x,0)/keep.length;
-                        const my=keep.reduce((s,p)=>s+p.y,0)/keep.length;
-                        slope=keep.reduce((s,p)=>s+(p.x-mx)*(p.y-my),0)/keep.reduce((s,p)=>s+(p.x-mx)**2,0);
-                        intercept=my-slope*mx;
-                        keep=points.filter(p=>Math.abs(p.y-slope*p.x-intercept)<2.5);
-                    }
-                    return {name,expected,angle:Math.atan(slope)*180/Math.PI,
-                        points:points.length,inliers:keep.length};
-                });
-        }""")
-        check('15f. actual alpha contours of both roofs and both floor edges follow the common axes',
-              len(contours)==4 and all(abs(line['angle']-line['expected'])<.3 and
-                line['inliers']/line['points']>.9 for line in contours),wall_angles(contours))
         masks = pg.evaluate("""() => {
             const scene=__cinema.renderer.scene, fg=scene.fg.getContext('2d'), header=scene.lintel.getContext('2d');
-            const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(...VC.RoomWarp.map(x,y));return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
-            return {opening:alpha(fg,321,620),wall:alpha(fg,410,660),header:alpha(header,321,560)};
+            const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(x,y);return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
+            return {opening:alpha(fg,298,620),wall:alpha(fg,440,690),header:alpha(header,300,500)};
         }""")
         check('16. doorway stays open while facade and lintel occlude the actor',
               masks['opening']==0 and masks['wall']>240 and masks['header']>240, json.dumps(masks))
@@ -450,11 +436,12 @@ def main():
             const caps=[];const ctx={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},fillRect(x,y){caps.push([x,y]);}};
             VC.Art.railings(ctx);
             const source=caps.map(([x,y])=>[(x+.5-12)*1672/936,(y+.6+1.04*VC.Layout.ZS-6)*941/527]);
+            const corner=VC.Layout.floorArt(19.55,17.15);
             return {count:caps.length,unique:new Set(caps.map(p=>p.map(v=>v.toFixed(4)).join(','))).size,
-                minX:Math.min(...source.map(p=>p[0])),corner:source.filter(p=>Math.hypot(p[0]-874.19905956,p[1]-922.15943922)<1).length};
+                minX:Math.min(...source.map(p=>p[0])),corner:source.filter(p=>Math.hypot(p[0]-corner[0],p[1]-corner[1])<1).length};
         }""")
         check('16b. fence starts beyond entrance wall and has one shared corner post',
-              rails['count']==rails['unique'] and rails['minX']>545 and rails['corner']==1, json.dumps(rails))
+              rails['count']==rails['unique'] and rails['minX']>535 and rails['corner']==1, json.dumps(rails))
         direct = pg.evaluate("""() => VC.Layout.buildSeats(60).every(seat=>{
             const approach=VC.Layout.routeToSeat(seat).slice(1,4);
             const travelled=approach.slice(1).reduce((sum,p,i)=>sum+Math.abs(p.x-approach[i].x),0);

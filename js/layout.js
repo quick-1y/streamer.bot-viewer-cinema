@@ -26,29 +26,53 @@
     SCREEN_X1: 17.65,
     SCREEN_Z0: 1.25,
     SCREEN_Z1: 5.15,
-    LEFT_AISLE: 1.4,
+    LEFT_AISLE: 1.0,
     CENTER_AISLE: 9.9,
-    RIGHT_AISLE: 18.4,
-    CROSS_Y: 16.2,
+    RIGHT_AISLE: 18.7,
+    // Behind the last row, but clear of the low entrance partition: walking at the
+    // old 16.2 the painted wall cut off the walkers' legs ("sinking into the floor").
+    CROSS_Y: 15.5,
     DOOR_X0: 1.2,
     DOOR_X1: 3.5,
     DOOR_H: 3.0,
     ROWS: [4.1, 6.1, 8.1, 10.7, 12.7, 14.7],
+    // A 4-tile centre aisle (2.6 tiles between chair edges) lets a walker pass
+    // the blocks without the neighbouring chair backs being drawn over them.
     BLOCKS: [
-      { x0: 2.65, n: 5 },
-      { x0: 11.0, n: 5 }
+      { x0: 2.3, n: 5 },
+      { x0: 11.9, n: 5 }
     ],
-    SEAT_PITCH: 1.5,
+    SEAT_PITCH: 1.4,
     WALK_OFFSET: 0.6 // walkway lies this far in front of a seat (toward the screen)
   };
 
-  // Three surveyed floor corners define one affine plane. Every floor object
-  // uses these two basis vectors, so parallel world edges stay parallel on screen.
-  L.FLOOR = { origin: [879, 274], x: [639, 344], y: [-645, 313] };
+  // Four surveyed floor corners, (0,0), (W,0), (W,D), (0,D), in room-art pixels.
+  // Each is the intersection of two painted edges: the screen-wall base (29.6°),
+  // the front floor edge (29.4°), the right floor edge and the left wall base.
+  // A projective map keeps the y = 0 and y = D rows exactly on those painted
+  // walls, so chair rows, rugs and the fence run parallel to the screen and
+  // the entrance even though the artwork is not a perfect parallel projection.
+  L.FLOOR = { corners: [[884, 291], [1477.1, 628], [907.7, 923.8], [293.7, 577.3]] };
+  (function () {
+    // Unit square → quad (Heckbert). H maps (u, v, 1) to homogeneous art pixels.
+    const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = L.FLOOR.corners;
+    const sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+    const dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2;
+    const den = dx1 * dy2 - dx2 * dy1;
+    const g = (sx * dy2 - dx2 * sy) / den, h = (dx1 * sy - sx * dy1) / den;
+    const H = [x1 - x0 + g * x1, x3 - x0 + h * x3, x0,
+      y1 - y0 + g * y1, y3 - y0 + h * y3, y0, g, h, 1];
+    const [a, b, c, d, e, f, p, q, r] = H;
+    const inv = [e * r - f * q, c * q - b * r, b * f - c * e,
+      f * p - d * r, a * r - c * p, c * d - a * f,
+      d * q - e * p, b * p - a * q, a * e - b * d];
+    L.FLOOR.H = H;
+    L.FLOOR.inverse = inv;
+  })();
   L.floorArt = function (x, y) {
-    const f = L.FLOOR;
-    return [f.origin[0] + x / L.W * f.x[0] + y / L.D * f.y[0],
-      f.origin[1] + x / L.W * f.x[1] + y / L.D * f.y[1]];
+    const [a, b, c, d, e, f, g, h, i] = L.FLOOR.H, u = x / L.W, v = y / L.D;
+    const w = g * u + h * v + i;
+    return [(a * u + b * v + c) / w, (d * u + e * v + f) / w];
   };
   L.project = function (x, y, z = 0) {
     const p = L.artPoint(...L.floorArt(x, y));
@@ -60,10 +84,9 @@
     return { x: 12 + (x * 936) / 1672, y: 6 + (y * 527) / 941 };
   };
   L.fromArt = function (x, y) {
-    const f = L.FLOOR, sx = x - f.origin[0], sy = y - f.origin[1];
-    const det = f.x[0] * f.y[1] - f.x[1] * f.y[0];
-    return { x: (sx * f.y[1] - sy * f.y[0]) / det * L.W,
-      y: (sy * f.x[0] - sx * f.x[1]) / det * L.D };
+    const [a, b, c, d, e, f, g, h, i] = L.FLOOR.inverse;
+    const w = g * x + h * y + i;
+    return { x: (a * x + b * y + c) / w * L.W, y: (d * x + e * y + f) / w * L.D };
   };
   L.RUGS = [
     { x0: 1.6, x1: 18.3, y0: 3.2, y1: 8.6,
@@ -73,43 +96,43 @@
   ];
   L.rugCorners = (r) => [[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]]
     .map(([x,y]) => L.floorArt(x,y));
+  // Entrance anchors and occlusion polygons, surveyed in the displayed room art.
   L.ART_GEOMETRY = {
-    gateLeft: [269, 641],
-    gateRight: [373, 700],
+    gateLeft: [240, 648],
+    gateRight: [357, 713],
     opening: [
-      [269, 544],
-      [373, 604],
-      [373, 700],
-      [269, 641]
+      [237, 530],
+      [357, 588],
+      [357, 713],
+      [240, 648]
     ],
     facade: [
-      [174, 456],
-      [224, 442],
-      [536, 626],
-      [536, 749],
-      [519, 765],
-      [373, 704],
-      [269, 645],
-      [246, 658],
-      [174, 632]
+      [157, 466],
+      [210, 441],
+      [398, 534],
+      [398, 584],
+      [531, 649],
+      [531, 769],
+      [513, 779],
+      [357, 722],
+      [240, 652],
+      [228, 660],
+      [155, 636]
     ],
     lintel: [
-      [224, 442],
-      [536, 626],
-      [536, 652],
-      [373, 604],
-      [269, 544],
-      [224, 516]
+      [210, 441],
+      [398, 534],
+      [398, 584],
+      [531, 649],
+      [531, 672],
+      [398, 607],
+      [357, 588],
+      [237, 530],
+      [210, 514]
     ],
-    railFront: [L.floorArt(9.7, 17.15), L.floorArt(19.55, 17.15)],
+    railFront: [L.floorArt(7.8, 17.15), L.floorArt(19.55, 17.15)],
     railRight: [L.floorArt(19.55, .8), L.floorArt(19.55, 17.15)]
   };
-
-  // The facade, opening and lights must follow the corrected background pixels.
-  for (const key of ['gateLeft','gateRight'])
-    L.ART_GEOMETRY[key] = VC.RoomWarp.map(...L.ART_GEOMETRY[key]);
-  for (const key of ['opening','facade','lintel'])
-    L.ART_GEOMETRY[key] = VC.RoomWarp.polygon(L.ART_GEOMETRY[key]);
 
   L.artContains = function (polygon, point) {
     let inside = false;
@@ -154,6 +177,16 @@
     return (p.x - L.doorX) * L.GATE.inward.x + (p.y - L.doorY) * L.GATE.inward.y;
   };
   L.isOutside = (p) => L.gateDistance(p) < 0;
+
+  // Just inside the door the painted facade is thick: floor between y ≈ 16 and
+  // 18.5 lies behind the wall, which would cut walkers off at the waist as if
+  // they sank into the floor. Walkers fade out under the sign and fade back in
+  // once their legs clear the wall, as if stepping out of a dark passage.
+  L.passageAlpha = function (p) {
+    if (p.x < L.GATE.left.x - 0.8 || p.x > L.GATE.right.x + 0.8) return 1;
+    if (p.y >= 19.2 || p.y <= 16.0) return 1;
+    return p.y > 18.4 ? (p.y - 18.4) / 0.8 : Math.max(0, Math.min(1, (17.5 - p.y) / 1.5));
+  };
 
   // ---------------------------------------------------------------- seats
   L.buildSeats = function (maxSeats) {

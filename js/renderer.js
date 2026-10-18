@@ -185,7 +185,10 @@
         y -= Math.round(a.sit * 4);
       }
       a.screenX = x; a.screenTop = y - footY * spriteScale + 1;
-      a.labelVisible = L.gateDistance(a.pos) < -0.3 || !L.facadeOccludes({ x: a.screenX, y: a.screenTop });
+      const alpha = L.passageAlpha(a.pos);
+      a.labelVisible = alpha > 0.5 && (L.gateDistance(a.pos) < -0.3 || !L.facadeOccludes({ x: a.screenX, y: a.screenTop }));
+      if (alpha <= 0) return;
+      ctx.globalAlpha = alpha;
 
       if (flip) {
         ctx.save();
@@ -196,6 +199,7 @@
       } else {
         ctx.drawImage(img, x - Math.floor(sp.w * spriteScale / 2), Math.round(y - footY * spriteScale), Math.round(sp.w * spriteScale), Math.round(sp.h * spriteScale));
       }
+      ctx.globalAlpha = 1;
     }
 
     // ------------------------------------------------------------------ labels

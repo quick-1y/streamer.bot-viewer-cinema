@@ -90,10 +90,20 @@
   };
   A.rugs = function (ctx) {
     ctx.save(); ctx.translate(24,12); ctx.scale(1872/1672,1054/941);
+    // The floor map is projective, so each rug is sampled as a grid of small
+    // affine cells: the texture stays undistorted and all four edges stay on
+    // their world lines.
+    const N=8;
     for(const rug of VC.Layout.RUGS) {
-      const target=VC.Layout.rugCorners(rug);
-      for(const ids of [[0,1,2],[0,2,3]])
-        VC.RoomWarp.triangle(ctx,A.images.room,ids.map(i=>rug.source[i]),ids.map(i=>target[i]),.25);
+      const [s0,s1,s2,s3]=rug.source;
+      const source=(u,v)=>[0,1].map(k=>(1-v)*((1-u)*s0[k]+u*s1[k])+v*((1-u)*s3[k]+u*s2[k]));
+      const target=(u,v)=>VC.Layout.floorArt(rug.x0+(rug.x1-rug.x0)*u,rug.y0+(rug.y1-rug.y0)*v);
+      for(let j=0;j<N;j++) for(let i=0;i<N;i++) {
+        const cell=[[i,j],[i+1,j],[i+1,j+1],[i,j+1]].map(([u,v])=>[u/N,v/N]);
+        const src=cell.map(c=>source(...c)), dst=cell.map(c=>target(...c));
+        for(const ids of [[0,1,2],[0,2,3]])
+          VC.RoomWarp.triangle(ctx,A.images.room,ids.map(k=>src[k]),ids.map(k=>dst[k]),.25);
+      }
     }
     ctx.restore();
   };
@@ -141,16 +151,17 @@
     front.scale(2, 2);
     A.railings(front);
     front.restore();
+    // Painted lamp positions in the displayed room art.
     const lights = [
-      [294, 405],
-      [442, 294],
-      [626, 200],
-      [778, 113],
-      [213, 545],
-      [407, 652],
-      [529, 315]
+      [279, 412],
+      [431, 299],
+      [615, 207],
+      [775, 115],
+      [197, 548],
+      [396, 645],
+      [517, 317]
     ].map(([x, y]) => ({
-      ...F(...VC.RoomWarp.map(x,y)),
+      ...F(x, y),
       r: 14,
       col: '255,172,74',
       a: 0.035
@@ -162,7 +173,7 @@
       lintel,
       seats: A.seats(),
       lights,
-      screenGlow: F(...VC.RoomWarp.map(1190,465)),
+      screenGlow: F(1195, 470),
       illustrated: true
     };
   };
@@ -282,6 +293,69 @@
     shadow.restore();
     return { cushion, back, ax: 31, ay: 46, w: 50, h: 50 };
   };
+  // The sheets only paint the front view standing. Walking towards the camera
+  // animates its legs: each leg is stretched or shortened from the hip and its
+  // foot swung sideways, alternating so one foot reaches forward (down-left on
+  // screen, the SW walking direction) while the other lifts behind.
+  const HIP = 90;
+  function stride(c, frame) {
+    const ctx = c.getContext('2d');
+    const legs = ctx.getImageData(0, HIP, 80, 128 - HIP);
+    // Split between the feet where the lowest rows hold the least paint.
+    let split = 40, least = Infinity;
+    for (let x = 28; x <= 52; x++) {
+      let sum = 0;
+      for (let y = legs.height - 18; y < legs.height - 2; y++) sum += legs.data[(y * 80 + x) * 4 + 3];
+      if (sum < least) { least = sum; split = x; }
+    }
+    const band = canvas(80, 128 - HIP);
+    band.getContext('2d').putImageData(legs, 0, 0);
+    ctx.clearRect(0, HIP, 80, 128 - HIP);
+    // frame 1: left leg forward, 2: passing, 3: right leg forward, 4: passing
+    const reach = [0, 8, 2, -8, -2][frame];
+    const h = 128 - HIP;
+    const leg = (x0, x1, grow, swing) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x0 + Math.min(0, swing) - 2, HIP, x1 - x0 + Math.abs(swing) + 4, h + 4);
+      ctx.clip();
+      // Hip fixed; the foot moves by `swing` px sideways and `grow` px down.
+      ctx.setTransform(1, 0, swing / h, (h + grow) / h, -swing / h * HIP, -grow / h * HIP);
+      ctx.drawImage(band, x0, 0, x1 - x0, h, x0, HIP, x1 - x0, h);
+      ctx.restore();
+    };
+    // The leg further from the camera is drawn first.
+    const left = () => leg(0, split, reach, -Math.max(0, reach) * 0.6);
+    const right = () => leg(split, 80, -reach, -Math.max(0, -reach) * 0.35);
+    if (reach >= 0) { right(); left(); } else { left(); right(); }
+  }
+
+  // The back view is painted mid-stride. Frame 1 keeps it, frame 3 mirrors the
+  // legs about their own centre (the other foot forward) and frames 2/4 draw
+  // them drawn together as the feet pass each other.
+  function gait(c, frame) {
+    if (frame === 1) return;
+    const ctx = c.getContext('2d'), h = 128 - HIP;
+    const legs = ctx.getImageData(0, HIP, 80, h);
+    let x0 = 80, x1 = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < 80; x++)
+      if (legs.data[(y * 80 + x) * 4 + 3] > 40) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
+    if (x1 <= x0) return;
+    const band = canvas(80, h), mid = (x0 + x1 + 1) / 2;
+    band.getContext('2d').putImageData(legs, 0, 0);
+    ctx.clearRect(0, HIP, 80, h);
+    ctx.save();
+    // Stretch from the hip so the waist stays joined to the jacket.
+    const sx = frame === 3 ? -1 : 0.58;
+    ctx.beginPath();
+    ctx.rect(0, HIP, 80, h);
+    ctx.clip();
+    ctx.translate(mid, 0);
+    ctx.scale(sx, 1);
+    ctx.drawImage(band, -mid, HIP);
+    ctx.restore();
+  }
+
   A.sprites = function (appearance) {
     const hash = VC.hash(appearance.hair + appearance.shirt + appearance.hairStyle);
     const row = hash % 4,
@@ -298,14 +372,8 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(atlas, x, y, w, h, (80 - dw) / 2, 124 - dh + bob, dw, dh);
-      if (col < 2 && (frame === 2 || frame === 3)) {
-        // Exchange the stride under the jacket while retaining the painted head/torso.
-        ctx.save();
-        ctx.translate(80, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(c, 0, 92, 80, 36, 0, 92, 80, 36);
-        ctx.restore();
-      }
+      if (col === 0 && frame) stride(c, frame);
+      else if (col === 1 && frame) gait(c, frame);
       // Stable, restrained wardrobe variations; face and hair retain their artwork.
       const hue = [-18, 0, 18, 36][(hash >>> 4) % 4];
       if (hue) {

@@ -14,9 +14,12 @@
   const WALK_SPEED = 3.0;    // tiles / second; keeps traversal bounded in the larger hall
   const SHUFFLE_SPEED = 1.1; // last step into the seat
   const SIT_TIME = 0.45;     // seconds to sit down / stand up
+  const TURN_TIME = 0.36;    // turn round in front of the seat (back to the chair) before sitting
+  const RISE_PAUSE = 0.18;   // stand with the back to the chair for a moment before walking off
   const PERSONAL_SPACE = 0.62;
   const MAX_YIELD = 1.6;     // never wait longer than this behind someone
-  const KEEP_RIGHT = 0.55;  // passing lanes fit the illustrated character width and door aperture
+  const KEEP_RIGHT = 0.4;   // passing lane; only used while someone walks the other way
+  const PASS_RANGE = 2.4;   // tiles: how far ahead an oncoming walker makes us keep right
 
   class Actor {
     constructor(viewer, seat) {
@@ -37,6 +40,7 @@
       this.lastLen = this.lens[this.lens.length - 1];
       this.s = 0;
       this.sit = 0;
+      this.turn = 0;                // 0 → TURN_TIME while turning round in front of the seat
       this.dir = 1;
       this.phase = 'queued';        // queued | walking | seated | gone
       this.pos = { x: this.route[0].x, y: this.route[0].y };
@@ -55,9 +59,12 @@
     isInside() { return this.phase === 'walking' || this.phase === 'seated'; }
     isLeaving() { return this.dir < 0; }
 
-    enter() { this.phase = 'walking'; this.dir = 1; this.s = 0; this.sit = 0; this.locate(); }
+    enter() { this.phase = 'walking'; this.dir = 1; this.s = 0; this.sit = 0; this.turn = 0; this.locate(); }
 
-    placeSeated() { this.phase = 'seated'; this.dir = 1; this.s = this.total; this.sit = 1; this.locate(); this.facing = 'NE'; }
+    placeSeated() {
+      this.phase = 'seated'; this.dir = 1; this.s = this.total; this.sit = 1; this.turn = TURN_TIME;
+      this.locate(); this.facing = 'NE';
+    }
 
     leave() {
       if (this.phase === 'queued') { this.phase = 'gone'; return; }
@@ -114,30 +121,49 @@
       if (this.phase === 'queued' || this.phase === 'gone') return;
       this.moving = false;
 
+      if (this.sit > 0) this.turn = TURN_TIME;   // seated (or restored mid-sit) means already turned
       if (this.dir > 0) {
+        // Walk up facing the chair, turn round so the back is to it, then sit down.
         if (this.s < this.total) this.advance(dt, others, +1);
+        else if (this.turn < TURN_TIME) this.turn = Math.min(TURN_TIME, this.turn + dt);
         else {
           this.sit = Math.min(1, this.sit + dt / SIT_TIME);
           if (this.sit >= 1) this.phase = 'seated';
         }
       } else {
+        // Stand up with the back to the chair, pause, then walk off facing the way we go.
         if (this.sit > 0) this.sit = Math.max(0, this.sit - dt / SIT_TIME);
-        else this.advance(dt, others, -1);
+        else if (this.turn > 0 && this.s >= this.total) this.turn = Math.max(0, this.turn - dt * TURN_TIME / RISE_PAUSE);
+        else { this.turn = 0; this.advance(dt, others, -1); }
         if (this.s <= 0 && this.sit <= 0) { this.phase = 'gone'; return; }
       }
       if (this.phase === 'seated' && this.dir > 0) this.idleClock += dt;
 
-      // Keep-right lateral offset on shared aisles so opposite walkers pass each other.
+      // Keep-right lateral offset on shared aisles, only while someone comes the other way.
       const p = this.basePos || this.sample(this.s);
       const onRowSegments = p.seg >= this.lens.length - 2;
-      const tx = onRowSegments || !this.moving ? 0 : -p.dy * this.dir * KEEP_RIGHT;
-      const ty = onRowSegments || !this.moving ? 0 : p.dx * this.dir * KEEP_RIGHT;
+      const lane = !onRowSegments && this.moving && this.oncoming(others) ? KEEP_RIGHT : 0;
+      const tx = -p.dy * this.dir * lane;
+      const ty = p.dx * this.dir * lane;
       const k = 1 - Math.exp(-dt * 6);
       this.offset.x += (tx - this.offset.x) * k;
       this.offset.y += (ty - this.offset.y) * k;
       this.pos = { x: p.x + this.offset.x, y: p.y + this.offset.y };
 
       this.updateFacing(p);
+    }
+
+    /** Another walker ahead of us, heading towards us. */
+    oncoming(others) {
+      const hx = this.heading.x, hy = this.heading.y;
+      for (const o of others) {
+        if (o === this || o.phase !== 'walking' || !o.moving) continue;
+        const rx = o.pos.x - this.pos.x, ry = o.pos.y - this.pos.y;
+        const dist = Math.hypot(rx, ry);
+        if (dist > PASS_RANGE || dist < 1e-4) continue;
+        if ((rx * hx + ry * hy) / dist > 0.5 && o.heading.x * hx + o.heading.y * hy < -0.5) return true;
+      }
+      return false;
     }
 
     advance(dt, others, sign) {
@@ -159,8 +185,10 @@
     }
 
     updateFacing(p) {
-      const inSeatRow = this.s >= this.total - this.lastLen - 1e-6;
-      if (this.sit > 0 || (inSeatRow && this.s > this.total - this.lastLen + 0.05)) { this.facing = 'NE'; return; }
+      // Seated, rising, or the second half of the turn: back to the chair, facing the screen.
+      if (this.sit > 0 || this.turn >= TURN_TIME / 2 || (this.turn > 0 && this.dir < 0)) { this.facing = 'NE'; return; }
+      // First half of the turn after stepping in face-first (SW): swing round through SE.
+      if (this.turn > 0) { this.facing = 'SE'; return; }
       if (!this.moving) return;
       const hx = this.heading.x, hy = this.heading.y;
       if (Math.abs(hx) >= Math.abs(hy)) this.facing = hx > 0 ? 'SE' : 'NW';

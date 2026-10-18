@@ -2,14 +2,13 @@
  * contrast edges in the rendered canvas determine the measured angle.
  * Theil–Sen initialization and trimmed least squares reject curtains and highlights.
  */
-({canvas, guides, target = true}) => {
-    // Search around the survey guides, but measure the angle from actual pixels.
-    const specs = [
+({canvas, guides, target = true, specs = [
         {name:'screen-upper-edge', sign:1},
         {name:'screen-lower-edge', sign:-1},
         {name:'cinema-sign-beam', sign:-1},
         {name:'entrance-beam-upper', sign:-1}
-    ];
+    ]}) => {
+    // Search around the survey guides, but measure the angle from actual pixels.
     const {width,height} = canvas;
     const pixels = canvas.getContext('2d').getImageData(0,0,width,height).data;
     const median = values => {
