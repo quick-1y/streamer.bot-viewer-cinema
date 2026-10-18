@@ -771,6 +771,7 @@
     return { cushion: cushion.c, back: backLayer.c, ax, ay };
   }
   VC.buildScene = function () {
+    if (VC.Art.available) return VC.Art.scene();
     const bg = canvas(L.VIEW_W, L.VIEW_H),
       fg = canvas(L.VIEW_W, L.VIEW_H),
       ctx = bg.ctx;

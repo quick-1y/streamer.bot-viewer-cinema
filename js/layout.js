@@ -10,9 +10,10 @@
   const VC = window.VC;
 
   const L = {
-    VIEW_W: 960, VIEW_H: 540,     // internal pixel-art resolution, scaled without smoothing
-    TW: 40, TH: 20, ZS: 25,       // tile width/height in px, px per z unit
-    OX: 450, OY: 148,              // screen position of world origin
+    VIEW_W: 960, VIEW_H: 540,
+    ART_SCALE: 2,                // artwork is composited at native 1920×1080 resolution     // internal pixel-art resolution, scaled without smoothing
+    TW: 40, TH: 20, ZS: 25.8,       // tile width/height in px, px per z unit
+    OX: 496.96, OY: 155.52,              // screen position of world origin
     W: 19.8, D: 17.4, H: 5.8,     // room size (x, y) and wall height
     STAGE_D: 2.1,                 // raised stage depth in front of the screen
     SCREEN_X0: 2.15, SCREEN_X1: 17.65, SCREEN_Z0: 1.25, SCREEN_Z1: 5.15,
@@ -26,7 +27,7 @@
   };
 
   L.project = function (x, y, z = 0) {
-    return { x: L.OX + (x - y) * (L.TW / 2), y: L.OY + (x + y) * (L.TH / 2) - z * L.ZS };
+    return { x: L.OX + x * 18.55 - y * 21.274, y: L.OY + x * 10.04 + y * 9.751 - z * L.ZS };
   };
 
   L.doorX = (L.DOOR_X0 + L.DOOR_X1) / 2;

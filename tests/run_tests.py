@@ -355,6 +355,8 @@ def main():
             pg.evaluate('() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
             scales.append(pg.evaluate('__cinema.renderer.scale'))
         check('14h. OBS resolutions use exact 1x, 2x and 4x pixel scales', scales == [1,2,4], str(scales))
+        check('14i. illustrated assets loaded and render at native 1080p', pg.evaluate(
+            "VC.Art.available && __cinema.renderer.scene.illustrated && __cinema.renderer.world.width === 1920 && __cinema.renderer.world.height === 1080"))
         pg.close(); m.stop()
 
         browser.close()

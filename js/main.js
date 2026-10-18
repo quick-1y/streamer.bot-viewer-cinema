@@ -38,7 +38,8 @@
       v === 'transparent' ? 'transparent' : v === 'dark' ? '#050407' : v;
   }
 
-  function start() {
+  async function start() {
+    await VC.Art.ready;
     const cfg = readConfig();
     VC.log.enabled = !!cfg.debug;
     applyBackground(cfg.background);

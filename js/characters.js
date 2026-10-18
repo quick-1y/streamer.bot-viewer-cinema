@@ -1,5 +1,5 @@
 /*
- * Procedural pixel-art characters.
+ * Stable appearance selection and procedural fallback for the illustrated pose atlases.
  * Appearance is derived from a hash of the login, so a viewer always looks the same.
  * Each character is rendered once into a handful of tiny frame canvases.
  */
@@ -352,6 +352,7 @@
     return cv;
   }
   VC.buildSprites = function (a) {
+    if (VC.Art.available) return VC.Art.sprites(a);
     const frames = (view) => [
       frame(a, view, 'idle'),
       ...[0, 1, 2, 3].map((f) => frame(a, view, 'walk', f))

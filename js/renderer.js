@@ -20,10 +20,11 @@
 
       this.world = document.createElement('canvas');
       this.world.className = 'world';
-      this.world.width = L.VIEW_W;
-      this.world.height = L.VIEW_H;
+      this.world.width = L.VIEW_W * L.ART_SCALE;
+      this.world.height = L.VIEW_H * L.ART_SCALE;
       this.ctx = this.world.getContext('2d');
       this.ctx.imageSmoothingEnabled = false;
+      this.ctx.scale(L.ART_SCALE, L.ART_SCALE);
 
       this.labels = document.createElement('canvas');
       this.labels.className = 'labels';
@@ -105,7 +106,7 @@
       const ctx = this.ctx;
       const S = this.scene;
       ctx.clearRect(0, 0, L.VIEW_W, L.VIEW_H);
-      ctx.drawImage(S.bg, 0, 0);
+      ctx.drawImage(S.bg, 0, 0, L.VIEW_W, L.VIEW_H);
       this.drawLights(time, true);
 
       const items = this.seatItems.slice();
@@ -121,11 +122,11 @@
 
       const seat = S.seats;
       for (const it of items) {
-        if (it.kind === 'cushion') ctx.drawImage(seat.cushion, it.sx - seat.ax, it.sy - seat.ay);
-        else if (it.kind === 'back') ctx.drawImage(seat.back, it.sx - seat.ax, it.sy - seat.ay);
+        if (it.kind === 'cushion') ctx.drawImage(seat.cushion, it.sx - seat.ax, it.sy - seat.ay, seat.w || seat.cushion.width, seat.h || seat.cushion.height);
+        else if (it.kind === 'back') ctx.drawImage(seat.back, it.sx - seat.ax, it.sy - seat.ay, seat.w || seat.back.width, seat.h || seat.back.height);
         else this.drawActor(it.actor);
       }
-      ctx.drawImage(S.fg, 0, 0);
+      ctx.drawImage(S.fg, 0, 0, L.VIEW_W, L.VIEW_H);
       outside.sort((a, b) => a.depth - b.depth).forEach((a) => this.drawActor(a));
       this.drawLights(time, false);
       this.drawLabels(visible);
@@ -140,7 +141,7 @@
         // pale bounce light from the blank screen onto stage and front rows
         const g = this.scene.screenGlow;
         const grd = ctx.createRadialGradient(g.x, g.y, 4, g.x, g.y, 150);
-        grd.addColorStop(0, 'rgba(170,155,180,0.045)');
+        grd.addColorStop(0, this.scene.illustrated ? 'rgba(170,155,180,0.012)' : 'rgba(170,155,180,0.045)');
         grd.addColorStop(1, 'rgba(170,155,180,0)');
         ctx.fillStyle = grd;
         ctx.fillRect(g.x - 150, g.y - 150, 300, 300);
@@ -162,7 +163,7 @@
       if (!a.sprites) a.sprites = VC.buildSprites(a.appearance);
       const ctx = this.ctx;
       const sp = a.sprites;
-      const spriteScale = 1.25;
+      const spriteScale = sp.scale || 1.25;
       const p = L.project(a.pos.x, a.pos.y, 0);
       let x = Math.round(p.x), y = Math.round(p.y);
       let img, flip = false, footY = sp.footY;
@@ -171,14 +172,15 @@
         img = sp.sit;
         footY = sp.sitFootY;
         const bob = (a.phase === 'seated' && (a.idleClock % a.idlePeriod) < 0.35) ? 1 : 0;
-        y = y - 14 + bob;          // align the seated pose with the taller upholstered chair
-        flip = true;
+        y = y - (sp.seatOffset ?? 14) + bob;
+        x += sp.seatShift || 0;          // align the seated pose with the taller upholstered chair
+        flip = !sp.generated;
       } else {
         const front = a.facing === 'SW' || a.facing === 'SE';
         const set = front ? sp.front : sp.back;
         const f = a.moving ? 1 + (Math.floor(a.walkClock * 3.2) % 4) : 0;
         img = set[f];
-        flip = a.facing === 'SE' || a.facing === 'NE';
+        flip = a.facing === 'SE' || a.facing === (sp.generated ? 'NW' : 'NE');
         y -= Math.round(a.sit * 4);
       }
       a.screenX = x; a.screenTop = y - footY * spriteScale + 1;
