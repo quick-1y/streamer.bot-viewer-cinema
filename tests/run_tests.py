@@ -372,7 +372,60 @@ def main():
         check('15. all six chair rows are straight and aligned with the painted floor',
               len(geometry)==6 and all(31.5 < r['angle'] < 32.5 and r['deviation'] < .65 for r in geometry),
               json.dumps(geometry))
+        masks = pg.evaluate("""() => {
+            const scene=__cinema.renderer.scene, fg=scene.fg.getContext('2d'), header=scene.lintel.getContext('2d');
+            const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(x,y);return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
+            return {opening:alpha(fg,321,620),wall:alpha(fg,410,660),header:alpha(header,321,560)};
+        }""")
+        check('16. doorway stays open while facade and lintel occlude the actor',
+              masks['opening']==0 and masks['wall']>240 and masks['header']>240, json.dumps(masks))
+        rails = pg.evaluate("""() => {
+            const caps=[];const ctx={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},fillRect(x,y){caps.push([x,y]);}};
+            VC.Art.railings(ctx);
+            const source=caps.map(([x,y])=>[(x+.5-12)*1672/936,(y+.6+1.04*VC.Layout.ZS-6)*941/527]);
+            return {count:caps.length,unique:new Set(caps.map(p=>p.map(v=>v.toFixed(4)).join(','))).size,
+                minX:Math.min(...source.map(p=>p[0])),corner:source.filter(p=>Math.hypot(p[0]-855,p[1]-914)<1).length};
+        }""")
+        check('16b. fence starts beyond entrance wall and has one shared corner post',
+              rails['count']==rails['unique'] and rails['minX']>545 and rails['corner']==1, json.dumps(rails))
+        direct = pg.evaluate("""() => VC.Layout.buildSeats(60).every(seat=>{
+            const approach=VC.Layout.routeToSeat(seat).slice(1,4);
+            const travelled=approach.slice(1).reduce((sum,p,i)=>sum+Math.abs(p.x-approach[i].x),0);
+            return Math.abs(travelled-Math.abs(approach.at(-1).x-approach[0].x))<1e-6;
+        })""")
+        check('16c. every route approaches its aisle without a cross-aisle U-turn', direct)
         pg.close(); m.stop()
+
+        # Actual entry and exit: capture the foot position when crossing the facade.
+        m=Mock(18087);m.set([])
+        pg=open_page(browser,18087,grace=0,remember=0)
+        wait_for(pg,lambda s:s['connection']=='ready',8)
+        pg.evaluate("""() => {
+            const a=__cinema.audience, update=a.update.bind(a);window.gateCrossings=[];const last=new Map();
+            a.update=(dt)=>{
+                update(dt);
+                for(const actor of a.actors.values()){
+                    if(actor.phase!=='walking')continue;
+                    const point={...actor.pos}, distance=VC.Layout.gateDistance(point),previous=last.get(actor.key);
+                    if(previous && ((previous.distance<=0 && distance>0) || (previous.distance>=0 && distance<0))){
+                        const t=previous.distance/(previous.distance-distance);
+                        const p=VC.Layout.project(previous.point.x+(point.x-previous.point.x)*t,previous.point.y+(point.y-previous.point.y)*t);
+                        gateCrossings.push({dir:actor.dir,x:(p.x-12)*1672/936,y:(p.y-6)*941/527});
+                    }
+                    last.set(actor.key,{point,distance});
+                }
+            };
+        }""")
+        m.set(['doorwalk']);m.ctl('/event')
+        good,s=wait_for(pg,lambda s:all_seated(s,1),25)
+        check('17. viewer enters through the calibrated doorway and reaches a seat',good)
+        m.set([]);m.ctl('/event')
+        good,s=wait_for(pg,lambda s:s['actors']==0,25)
+        crossings=pg.evaluate('gateCrossings')
+        check('17b. entry and exit cross the visible opening with clearance from jambs',good and
+              len(crossings)==2 and {c['dir'] for c in crossings}=={1,-1} and
+              all(295<c['x']<348 and abs(c['y']-(641+(c['x']-269)*59/104))<2 for c in crossings),json.dumps(crossings))
+        pg.close();m.stop()
 
         browser.close()
 

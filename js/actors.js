@@ -16,7 +16,7 @@
   const SIT_TIME = 0.45;     // seconds to sit down / stand up
   const PERSONAL_SPACE = 0.62;
   const MAX_YIELD = 1.6;     // never wait longer than this behind someone
-  const KEEP_RIGHT = 0.17;
+  const KEEP_RIGHT = 0.55;  // passing lanes fit the illustrated character width and door aperture
 
   class Actor {
     constructor(viewer, seat) {
@@ -171,7 +171,7 @@
     get depth() { return this.pos.x + this.pos.y + 0.02; }
 
     /** Within the front entrance threshold. */
-    get inDoorway() { return this.pos.y > L.D - 0.35; }
+    get inDoorway() { return Math.abs(L.gateDistance(this.pos)) < 0.35; }
   }
 
   VC.Actor = Actor;

@@ -83,7 +83,8 @@
   A.scene = function () {
     const L = VC.Layout,
       bg = canvas(1920, 1080),
-      fg = canvas(1920, 1080);
+      fg = canvas(1920, 1080),
+      lintel = canvas(1920, 1080);
     const ctx = bg.getContext('2d'),
       front = fg.getContext('2d');
     ctx.imageSmoothingEnabled = true;
@@ -91,31 +92,32 @@
     ctx.filter = 'brightness(.9) saturate(.94)';
     // Preserve the original fine detail: no low-resolution intermediate canvas.
     ctx.drawImage(A.images.room, 24, 12, 1872, 1054);
-    const F = (x, y) => ({ x: 12 + x * 0.56, y: 6 + y * 0.56 });
+    const F = L.artPoint;
+    function polygon(context, points) {
+      points.forEach(([x, y], i) => {
+        const p = F(x, y);
+        i ? context.lineTo(p.x, p.y) : context.moveTo(p.x, p.y);
+      });
+      context.closePath();
+    }
     // Foreground facade, including its genuine door opening. Copy the painted
     // pixels after the actors so walkers pass behind the wall and through the door.
     front.save();
     front.scale(2, 2);
     front.filter = 'brightness(.9) saturate(.94)';
     front.beginPath();
-    [
-      [224, 442],
-      [528, 651],
-      [528, 747],
-      [374, 662],
-      [374, 583],
-      [257, 513],
-      [257, 633],
-      [166, 584],
-      [166, 454]
-    ].forEach(([x, y], i) => {
-      const p = F(x, y);
-      i ? front.lineTo(p.x, p.y) : front.moveTo(p.x, p.y);
-    });
-    front.closePath();
-    front.clip();
+    polygon(front, L.ART_GEOMETRY.facade);
+    polygon(front, L.ART_GEOMETRY.opening);
+    front.clip('evenodd');
     front.drawImage(A.images.room, 12, 6, 936, 527);
     front.restore();
+    const header = lintel.getContext('2d');
+    header.scale(2, 2);
+    header.filter = 'brightness(.9) saturate(.94)';
+    header.beginPath();
+    polygon(header, L.ART_GEOMETRY.lintel);
+    header.clip();
+    header.drawImage(A.images.room, 12, 6, 936, 527);
     front.save();
     front.scale(2, 2);
     A.railings(front);
@@ -134,7 +136,15 @@
       col: '255,172,74',
       a: 0.035
     }));
-    return { bg, fg, seats: A.seats(), lights, screenGlow: F(1190, 465), illustrated: true };
+    return {
+      bg,
+      fg,
+      lintel,
+      seats: A.seats(),
+      lights,
+      screenGlow: F(1190, 465),
+      illustrated: true
+    };
   };
   A.railings = function (ctx) {
     const L = VC.Layout,
@@ -164,7 +174,11 @@
       ctx.lineWidth = width;
       ctx.stroke();
     }
+    const posted = new Set();
     function post(x, y) {
+      const key = x.toFixed(5) + ',' + y.toFixed(5);
+      if (posted.has(key)) return;
+      posted.add(key);
       const s = 0.1,
         h = 1.02;
       shape(
@@ -202,10 +216,12 @@
       ctx.fillStyle = '#ffe0a0';
       ctx.fillRect(p.x - 0.5, p.y - 0.6, 1, 1.2);
     }
-    for (const [a, b, axis] of [
-      [[5.6, L.D - 0.18], [L.W - 0.22, L.D - 0.18], 0],
-      [[L.W - 0.22, 0.7], [L.W - 0.22, L.D - 0.18], 1]
+    for (const [start, end, axis] of [
+      [L.fromArt(...L.ART_GEOMETRY.railFront[0]), L.fromArt(...L.ART_GEOMETRY.railFront[1]), 0],
+      [L.fromArt(...L.ART_GEOMETRY.railRight[0]), L.fromArt(...L.ART_GEOMETRY.railRight[1]), 1]
     ]) {
+      const a = [start.x, start.y],
+        b = [end.x, end.y];
       const normal = axis === 0 ? [0, 0.16] : [0.16, 0],
         h = 0.95;
       for (const z of [0.28, h]) {
@@ -222,8 +238,9 @@
         line([...a, z + 0.015], [...b, z + 0.015], z === h ? '#b56f33' : '#684021', 0.65);
       }
       const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      for (let t = 0; t <= length; t += 1.65)
-        post(a[0] + ((b[0] - a[0]) * t) / length, a[1] + ((b[1] - a[1]) * t) / length);
+      const sections = Math.ceil(length / 1.65);
+      for (let i = 0; i <= sections; i++)
+        post(a[0] + ((b[0] - a[0]) * i) / sections, a[1] + ((b[1] - a[1]) * i) / sections);
     }
   };
   A.seats = function () {
