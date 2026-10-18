@@ -1,0 +1,91 @@
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('../fonts/PixelifySans.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: block;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+#stage canvas {
+  position: absolute;
+  display: block;
+}
+
+#stage canvas.world {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#stage canvas.labels {
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+/* "В зале: N" — scales with the scene (--u = 1 at 1920×1080) */
+.counter {
+  --u: 1;
+  position: absolute;
+  left: calc(26px * var(--u));
+  top: calc(24px * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(12px * var(--u));
+  padding: calc(9px * var(--u)) calc(22px * var(--u)) calc(9px * var(--u)) calc(14px * var(--u));
+  font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
+  font-weight: 600;
+  color: #ffe9c4;
+  background: linear-gradient(#2a140c, #1c0c07);
+  border: calc(3px * var(--u)) solid #c9772e;
+  border-radius: calc(10px * var(--u));
+  box-shadow:
+    0 0 0 calc(3px * var(--u)) #3a1a0c,
+    inset 0 0 0 calc(2px * var(--u)) #5a2c12,
+    0 calc(6px * var(--u)) calc(18px * var(--u)) rgba(0, 0, 0, 0.45);
+  text-shadow: 0 calc(2px * var(--u)) 0 #000;
+  line-height: 1;
+  user-select: none;
+}
+
+.counter .icon {
+  display: block;
+  flex: 0 0 auto;
+  width: calc(36px * var(--u));
+  height: calc(42px * var(--u));
+}
+
+.counter .icon canvas {
+  display: block;
+  width: calc(36px * var(--u));
+  height: calc(42px * var(--u));
+  image-rendering: pixelated;
+}
+
+.counter .label { font-size: calc(34px * var(--u)); letter-spacing: 0.02em; }
+.counter .value {
+  font-size: calc(44px * var(--u));
+  min-width: 1.4ch;
+  text-align: right;
+  color: #fff6e0;
+}
+
+.counter.bump .value { animation: bump 0.45s ease-out; }
+@keyframes bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.22); color: #ffd36b; }
+  100% { transform: scale(1); }
+}
