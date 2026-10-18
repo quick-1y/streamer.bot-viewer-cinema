@@ -6,6 +6,7 @@
   const sources = {
     room: 'assets/art/cinema-room.png',
     alignedRoom: 'assets/art/cinema-room-aligned.png',
+    decorBackground: 'assets/art/cinema-decor-background.png',
     chair: 'assets/art/cinema-chair.png',
     viewers: 'assets/art/viewers.png',
     viewersExtra: 'assets/art/viewers-extra.png'
@@ -91,6 +92,7 @@
   A.room = function () {
     const room=canvas(1672,941);
     room.getContext('2d').drawImage(A.images.alignedRoom,0,0);
+    VC.Decor.cleanRoom(room.getContext('2d'), A.images.decorBackground);
     return room;
   };
   A.rugs = function (ctx) {
@@ -112,12 +114,14 @@
     }
     ctx.restore();
   };
-  A.scene = function () {
+  A.scene = function (opts = {}) {
     const L = VC.Layout,
       bg = canvas(1920, 1080),
       fg = canvas(1920, 1080),
       lintel = canvas(1920, 1080),
       room = A.room();
+    const sign = VC.Decor.sign(opts.signText);
+    VC.Decor.drawSign(room.getContext('2d'), sign);
     const ctx = bg.getContext('2d'),
       front = fg.getContext('2d');
     ctx.imageSmoothingEnabled = true;
@@ -176,6 +180,8 @@
       room,
       fg,
       lintel,
+      posters: VC.Decor.posters(A.images.alignedRoom, opts.posters),
+      sign,
       seats: A.seats(),
       lights,
       screenGlow: F(1195, 470),

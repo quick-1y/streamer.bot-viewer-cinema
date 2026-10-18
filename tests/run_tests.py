@@ -110,6 +110,66 @@ def main():
         check('SHA-256 (JS fallback and WebCrypto) match Node crypto', ok and js_hash == node_hash == sub_hash, node_hash)
         pg.close()
 
+        # ---------------------------------------------------------------- independent decor
+        pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
+        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.wait_for_function('window.__cinema !== undefined')
+        decor = pg.evaluate('''() => {
+            const scene = __cinema.renderer.scene;
+            return {ids: scene.posters.map(p => p.id),
+                distinct: new Set(scene.posters.map(p => p.image)).size,
+                sign: scene.sign.text};
+        }''')
+        check('decor. five posters are separate cached objects', decor['ids'] ==
+              ['poster1', 'poster2', 'poster3', 'poster4', 'poster5'] and decor['distinct'] == 5)
+        check('decor. default marquee text is CINEMA', decor['sign'] == 'CINEMA')
+        custom = pg.evaluate('''async () => {
+            // Compare against bundled art independently of configured placeholders.
+            await VC.Decor.ready({});
+            const before = VC.buildScene();
+            const replacement = document.createElement('canvas');
+            replacement.width = replacement.height = 16;
+            const ctx = replacement.getContext('2d');
+            ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, 16, 16);
+            await VC.Decor.ready({poster3: replacement.toDataURL()});
+            const after = VC.buildScene({posters: {poster2: null}, signText: 'Мой канал'});
+            const pixels = s => Array.from(s.image.getContext('2d')
+                .getImageData(0, 0, s.image.width, s.image.height).data);
+            const oldGood = pixels(before.posters.find(p => p.id === 'poster3'));
+            const newGood = pixels(after.posters.find(p => p.id === 'poster3'));
+            const untouched = before.posters.filter(p => !['poster3', 'poster2'].includes(p.id))
+                .every(p => JSON.stringify(pixels(p)) ===
+                    JSON.stringify(pixels(after.posters.find(q => q.id === p.id))));
+            const b = after.bg.getContext('2d');
+            // This point falls inside the old Good Vibes artwork; the room itself
+            // must now contain red wall, even when no poster object is drawn.
+            const wall = b.getImageData(450, 390, 1, 1).data;
+            return {ids: after.posters.map(p => p.id), untouched,
+                replaced: JSON.stringify(oldGood) !== JSON.stringify(newGood),
+                wall: wall[0] > wall[1] * 1.5 && wall[0] > wall[2] * 1.5};
+        }''')
+        check('decor. replacement changes only its own poster', custom['replaced'] and custom['untouched'])
+        check('decor. individual posters can be hidden', 'poster2' not in custom['ids'] and len(custom['ids']) == 4)
+        check('decor. room underneath posters is clean wall', custom['wall'])
+        for label, query, expected in [
+            ('short', 'MyChannel', 'MyChannel'),
+            ('Cyrillic', '%D0%9C%D0%BE%D0%B9%20%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB', 'Мой канал'),
+            ('long', 'LongChannelName' * 20, 'LongChannelName' * 20),
+            ('empty', '', '')
+        ]:
+            pg.goto(PAGE + '?demo=1&remember=0&sign=' + query)
+            pg.wait_for_function('window.__cinema !== undefined')
+            fitted = pg.evaluate('''() => {
+                const s = __cinema.renderer.scene.sign;
+                const pixels = s.image.getContext('2d').getImageData(0,0,640,160).data;
+                return {text: s.text, width: s.width, height: s.height,
+                    visible: pixels.some((v, i) => i % 4 === 3 && v > 0)};
+            }''')
+            check('decor. ' + label + ' marquee fits its panel', fitted['text'] == expected and
+                  fitted['width'] <= 592.001 and fitted['height'] <= 128.001 and
+                  fitted['visible'] == bool(expected))
+        pg.close()
+
         # ---------------------------------------------------------------- 1. empty list
         m = Mock(18080)
         m.set([])
