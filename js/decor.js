@@ -6,12 +6,32 @@
   // Corners in the original 1672×941 artwork: top-left, top-right, bottom-left.
   // The frames remain part of each object, rather than part of the room.
   D.slots = [
-    { id: 'sunset', corners: [[253, 342], [291, 324], [253, 450]] },
-    { id: 'small', corners: [[302, 342], [331, 328], [302, 389]] },
-    { id: 'goodVibes', corners: [[344, 300], [413, 267], [344, 396]] },
-    { id: 'mountains', corners: [[662, 158], [733, 123], [662, 264]] },
-    { id: 'space', corners: [[755, 155], [819, 124], [755, 258]] }
+    { id: 'sunset', corners: [[237, 355], [276, 336], [237, 456]] },
+    { id: 'small', corners: [[290, 347], [319, 333], [290, 397]] },
+    { id: 'goodVibes', corners: [[328, 309], [401, 274], [328, 404]] },
+    { id: 'mountains', corners: [[652, 162], [724, 127], [652, 268]] },
+    { id: 'space', corners: [[750, 163], [815, 131], [750, 246]] }
   ];
+  function quad([a, b, d], padding = 0) {
+    const at = (u, v) => [0, 1].map(k => a[k] + u * (b[k] - a[k]) + v * (d[k] - a[k]));
+    return [[-padding, -padding], [1 + padding, -padding],
+      [1 + padding, 1 + padding], [-padding, 1 + padding]].map(p => at(...p));
+  }
+  D.cleanRoom = function (ctx, clean) {
+    const patches = D.slots.map(s => quad(s.corners, .035));
+    patches.push(quad([[243, 486], [349, 546], [243, 518]]));
+    // Replace only decoration footprints; preserve the hand-calibrated room,
+    // floor, walls, door, lamps and silhouette pixel for pixel everywhere else.
+    for (const points of patches) {
+      ctx.save();
+      ctx.beginPath();
+      points.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p));
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(clean, 0, 0);
+      ctx.restore();
+    }
+  };
   const replacements = new Map();
   D.ready = async function (config = {}) {
     replacements.clear();
@@ -97,7 +117,7 @@
   // Draw within the painted lightbox; the affine transform follows its facade.
   D.drawSign = function (ctx, sign) {
     ctx.save();
-    ctx.transform(94 / 640, 53 / 640, 0, 24 / 160, 262, 486);
+    ctx.transform(98 / 640, 55.5 / 640, 0, 24 / 160, 247, 490);
     ctx.drawImage(sign.image, 0, 0);
     ctx.restore();
   };

@@ -52,7 +52,7 @@
       const items = [];
       for (const s of seats) {
         const p = L.project(s.x, s.y, 0);
-        const sx = Math.round(p.x), sy = Math.round(p.y);
+        const sx = Math.round(p.x * L.ART_SCALE) / L.ART_SCALE, sy = Math.round(p.y * L.ART_SCALE) / L.ART_SCALE;
         items.push({ depth: s.x + s.y - 0.3, kind: 'cushion', sx, sy });
         items.push({ depth: s.x + s.y + 0.36, kind: 'back', sx, sy });
       }
@@ -118,7 +118,7 @@
       for (const a of audience.actors.values()) {
         if (!a.isInside()) continue;
         visible.push(a);
-        if (a.pos.y > L.D) outside.push(a);
+        if (L.isOutside(a.pos)) outside.push(a);
         else items.push({ depth: a.depth, kind: 'actor', actor: a });
       }
       items.sort((p, q) => p.depth - q.depth);
@@ -131,6 +131,7 @@
       }
       ctx.drawImage(S.fg, 0, 0, L.VIEW_W, L.VIEW_H);
       outside.sort((a, b) => a.depth - b.depth).forEach((a) => this.drawActor(a));
+      if (S.lintel) ctx.drawImage(S.lintel, 0, 0, L.VIEW_W, L.VIEW_H);
       this.drawLights(time, false);
       this.drawLabels(visible);
       this.setCount(audience.hallCount);
@@ -187,6 +188,10 @@
         y -= Math.round(a.sit * 4);
       }
       a.screenX = x; a.screenTop = y - footY * spriteScale + 1;
+      const alpha = a.alpha;
+      a.labelVisible = L.gateDistance(a.pos) < -0.3 || !L.facadeOccludes({ x: a.screenX, y: a.screenTop });
+      if (alpha <= 0) return;
+      ctx.globalAlpha = alpha;
 
       if (flip) {
         ctx.save();
@@ -197,6 +202,7 @@
       } else {
         ctx.drawImage(img, x - Math.floor(sp.w * spriteScale / 2), Math.round(y - footY * spriteScale), Math.round(sp.w * spriteScale), Math.round(sp.h * spriteScale));
       }
+      ctx.globalAlpha = 1;
     }
 
     // ------------------------------------------------------------------ labels
@@ -215,7 +221,7 @@
       const fh = this.fontPx;
       const pad = Math.max(2, Math.round(fh * 0.18));
       // Closest-to-camera first: they keep their spot; farther labels lift to avoid overlap.
-      const order = actors.slice().sort((p, q) => q.depth - p.depth);
+      const order = actors.filter((a) => a.labelVisible !== false).sort((p, q) => q.depth - p.depth);
       const placed = [];
       const dt = this.lastDt || 1 / 60;
       for (const a of order) {
@@ -239,7 +245,7 @@
       for (let i = order.length - 1; i >= 0; i--) {
         const a = order[i];
         const lab = a._label;
-        const alpha = 1;
+        const alpha = a.alpha;
         if (alpha <= 0) continue;
         ctx.globalAlpha = alpha;
         ctx.lineWidth = Math.max(3, fh * 0.3);
