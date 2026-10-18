@@ -394,9 +394,54 @@ def main():
               plane['rugs'] and plane['rails'],json.dumps(plane))
         check('15c. first chair row has at least 130 source pixels of perpendicular screen-wall clearance',
               plane['gap']>=130,json.dumps(plane))
+        wall_pixels = pg.evaluate("""() => {
+            const measure = """ + (ROOT / 'tests' / 'wall_pixels.js').read_text() + """;
+            const original=document.createElement('canvas');
+            original.width=1672;original.height=941;
+            original.getContext('2d').drawImage(VC.Art.images.room,0,0);
+            const guides=VC.RoomMesh.guides;
+            return {original:measure({canvas:original,guides,target:false}),
+                corrected:measure({canvas:__cinema.renderer.scene.room,guides})};
+        }""")
+        def walls_aligned(lines):
+            return len(lines)==4 and all(line['angle'] is not None and
+                28.0 < line['angle'] < 28.6 and line['points']>40 and
+                line['inliers']/line['points']>.75 and line['residual']<1.5 for line in lines)
+        wall_angles=lambda lines: ', '.join(f"{line['name']}={line['angle']:.3f}°" if
+            line['angle'] is not None else f"{line['name']}=unmeasurable" for line in lines)
+        check('15d. actual screen and entrance-beam pixels share the floor angle within 0.3 degrees',
+              walls_aligned(wall_pixels['corrected']),wall_angles(wall_pixels['corrected']))
+        check('15e. pixel regression detects the inconsistent angles in the original artwork',
+              not walls_aligned(wall_pixels['original']),wall_angles(wall_pixels['original']))
+        contours = pg.evaluate("""() => {
+            const room=__cinema.renderer.scene.room,{width,height}=room;
+            const rgba=room.getContext('2d').getImageData(0,0,width,height).data;
+            return [['left roof',200,800,false,-25.889],['screen roof',950,1450,false,28.3],
+                ['front floor',580,820,true,28.3],['right floor',950,1450,true,-25.889]]
+                .map(([name,x0,x1,bottom,expected])=>{
+                    const points=[];
+                    for(let x=x0;x<=x1;x++)for(let i=0;i<height;i++){
+                        const y=bottom?height-1-i:i;
+                        if(rgba[(y*width+x)*4+3]>127){points.push({x,y});break;}
+                    }
+                    let keep=points,slope=0,intercept=0;
+                    for(let pass=0;pass<4;pass++){
+                        const mx=keep.reduce((s,p)=>s+p.x,0)/keep.length;
+                        const my=keep.reduce((s,p)=>s+p.y,0)/keep.length;
+                        slope=keep.reduce((s,p)=>s+(p.x-mx)*(p.y-my),0)/keep.reduce((s,p)=>s+(p.x-mx)**2,0);
+                        intercept=my-slope*mx;
+                        keep=points.filter(p=>Math.abs(p.y-slope*p.x-intercept)<2.5);
+                    }
+                    return {name,expected,angle:Math.atan(slope)*180/Math.PI,
+                        points:points.length,inliers:keep.length};
+                });
+        }""")
+        check('15f. actual alpha contours of both roofs and both floor edges follow the common axes',
+              len(contours)==4 and all(abs(line['angle']-line['expected'])<.3 and
+                line['inliers']/line['points']>.9 for line in contours),wall_angles(contours))
         masks = pg.evaluate("""() => {
             const scene=__cinema.renderer.scene, fg=scene.fg.getContext('2d'), header=scene.lintel.getContext('2d');
-            const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(x,y);return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
+            const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(...VC.RoomWarp.map(x,y));return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
             return {opening:alpha(fg,321,620),wall:alpha(fg,410,660),header:alpha(header,321,560)};
         }""")
         check('16. doorway stays open while facade and lintel occlude the actor',
@@ -432,7 +477,11 @@ def main():
                     if(previous && ((previous.distance<=0 && distance>0) || (previous.distance>=0 && distance<0))){
                         const t=previous.distance/(previous.distance-distance);
                         const p=VC.Layout.project(previous.point.x+(point.x-previous.point.x)*t,previous.point.y+(point.y-previous.point.y)*t);
-                        gateCrossings.push({dir:actor.dir,x:(p.x-12)*1672/936,y:(p.y-6)*941/527});
+                        const x=(p.x-12)*1672/936,y=(p.y-6)*941/527;
+                        const [a,b]=[VC.Layout.ART_GEOMETRY.gateLeft,VC.Layout.ART_GEOMETRY.gateRight];
+                        const dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy);
+                        gateCrossings.push({dir:actor.dir,x,y,across:((x-a[0])*dx+(y-a[1])*dy)/(length*length),
+                            deviation:Math.abs(dx*(y-a[1])-dy*(x-a[0]))/length});
                     }
                     last.set(actor.key,{point,distance});
                 }
@@ -446,7 +495,7 @@ def main():
         crossings=pg.evaluate('gateCrossings')
         check('17b. entry and exit cross the visible opening with clearance from jambs',good and
               len(crossings)==2 and {c['dir'] for c in crossings}=={1,-1} and
-              all(295<c['x']<348 and abs(c['y']-(641+(c['x']-269)*59/104))<2 for c in crossings),json.dumps(crossings))
+              all(.2<c['across']<.8 and c['deviation']<1 for c in crossings),json.dumps(crossings))
         pg.close();m.stop()
 
         browser.close()

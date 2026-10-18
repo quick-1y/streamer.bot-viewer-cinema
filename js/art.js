@@ -5,7 +5,7 @@
   const A = (VC.Art = { images: {}, ready: null, available: false });
   const sources = {
     room: 'assets/art/cinema-room.png',
-    floor: 'assets/art/cinema-floor.png',
+    alignedRoom: 'assets/art/cinema-room-aligned.png',
     chair: 'assets/art/cinema-chair.png',
     viewers: 'assets/art/viewers.png',
     viewersExtra: 'assets/art/viewers-extra.png'
@@ -81,44 +81,19 @@
     c.height = h;
     return c;
   }
-  // Resample the existing woven artwork onto exact world rectangles once.
-  // The clean floor is used only beneath the old rug footprints; the room,
-  // facade, lettering and lighting outside those footprints remain original.
-  A.floor = function (ctx) {
-    const L = VC.Layout;
-    ctx.save();
-    ctx.translate(24, 12);
-    ctx.scale(1872 / 1672, 1054 / 941);
-    function path(points) {
-      ctx.beginPath();
-      points.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
-      ctx.closePath();
-    }
-    for (const rug of L.RUGS) {
-      const center = rug.source.reduce((p,q) => [p[0]+q[0]/4,p[1]+q[1]/4],[0,0]);
-      ctx.save();
-      path(rug.source.map(p => p.map((v,i) => center[i]+(v-center[i])*1.025)));
-      ctx.clip();
-      ctx.drawImage(A.images.floor,0,0,1672,941);
-      ctx.restore();
-    }
-    function triangle(source, target) {
-      const [s,p,q] = source, [t,u,v] = target;
-      const px=p[0]-s[0], py=p[1]-s[1], qx=q[0]-s[0], qy=q[1]-s[1];
-      const ux=u[0]-t[0], uy=u[1]-t[1], vx=v[0]-t[0], vy=v[1]-t[1];
-      const det=px*qy-py*qx;
-      const a=(ux*qy-vx*py)/det, c=(vx*px-ux*qx)/det;
-      const b=(uy*qy-vy*py)/det, d=(vy*px-uy*qx)/det;
-      ctx.save();
-      path(target); ctx.clip();
-      ctx.transform(a,b,c,d,t[0]-a*s[0]-c*s[1],t[1]-b*s[0]-d*s[1]);
-      ctx.drawImage(A.images.room,0,0);
-      ctx.restore();
-    }
-    for (const rug of L.RUGS) {
-      const target=L.rugCorners(rug);
-      for (const ids of [[0,1,2],[0,2,3]])
-        triangle(ids.map(i=>rug.source[i]),ids.map(i=>target[i]));
+  // The deterministic mesh is baked into this bundled layer. No pixel readback
+  // or filesystem fetch is needed when OBS opens the overlay as a local file.
+  A.room = function () {
+    const room=canvas(1672,941);
+    room.getContext('2d').drawImage(A.images.alignedRoom,0,0);
+    return room;
+  };
+  A.rugs = function (ctx) {
+    ctx.save(); ctx.translate(24,12); ctx.scale(1872/1672,1054/941);
+    for(const rug of VC.Layout.RUGS) {
+      const target=VC.Layout.rugCorners(rug);
+      for(const ids of [[0,1,2],[0,2,3]])
+        VC.RoomWarp.triangle(ctx,A.images.room,ids.map(i=>rug.source[i]),ids.map(i=>target[i]),.25);
     }
     ctx.restore();
   };
@@ -126,15 +101,16 @@
     const L = VC.Layout,
       bg = canvas(1920, 1080),
       fg = canvas(1920, 1080),
-      lintel = canvas(1920, 1080);
+      lintel = canvas(1920, 1080),
+      room = A.room();
     const ctx = bg.getContext('2d'),
       front = fg.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.filter = 'brightness(.9) saturate(.94)';
     // Preserve the original fine detail: no low-resolution intermediate canvas.
-    ctx.drawImage(A.images.room, 24, 12, 1872, 1054);
-    A.floor(ctx);
+    ctx.drawImage(room, 24, 12, 1872, 1054);
+    A.rugs(ctx);
     const F = L.artPoint;
     function polygon(context, points) {
       points.forEach(([x, y], i) => {
@@ -152,7 +128,7 @@
     polygon(front, L.ART_GEOMETRY.facade);
     polygon(front, L.ART_GEOMETRY.opening);
     front.clip('evenodd');
-    front.drawImage(A.images.room, 12, 6, 936, 527);
+    front.drawImage(room, 12, 6, 936, 527);
     front.restore();
     const header = lintel.getContext('2d');
     header.scale(2, 2);
@@ -160,7 +136,7 @@
     header.beginPath();
     polygon(header, L.ART_GEOMETRY.lintel);
     header.clip();
-    header.drawImage(A.images.room, 12, 6, 936, 527);
+    header.drawImage(room, 12, 6, 936, 527);
     front.save();
     front.scale(2, 2);
     A.railings(front);
@@ -174,18 +150,19 @@
       [407, 652],
       [529, 315]
     ].map(([x, y]) => ({
-      ...F(x, y),
+      ...F(...VC.RoomWarp.map(x,y)),
       r: 14,
       col: '255,172,74',
       a: 0.035
     }));
     return {
       bg,
+      room,
       fg,
       lintel,
       seats: A.seats(),
       lights,
-      screenGlow: F(1190, 465),
+      screenGlow: F(...VC.RoomWarp.map(1190,465)),
       illustrated: true
     };
   };

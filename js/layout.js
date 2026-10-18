@@ -105,6 +105,12 @@
     railRight: [L.floorArt(19.55, .8), L.floorArt(19.55, 17.15)]
   };
 
+  // The facade, opening and lights must follow the corrected background pixels.
+  for (const key of ['gateLeft','gateRight'])
+    L.ART_GEOMETRY[key] = VC.RoomWarp.map(...L.ART_GEOMETRY[key]);
+  for (const key of ['opening','facade','lintel'])
+    L.ART_GEOMETRY[key] = VC.RoomWarp.polygon(L.ART_GEOMETRY[key]);
+
   L.artContains = function (polygon, point) {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
