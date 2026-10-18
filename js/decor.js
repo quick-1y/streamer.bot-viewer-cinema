@@ -6,11 +6,11 @@
   // Corners in the original 1672×941 artwork: top-left, top-right, bottom-left.
   // The frames remain part of each object, rather than part of the room.
   D.slots = [
-    { id: 'sunset', corners: [[237, 355], [276, 336], [237, 456]] },
-    { id: 'small', corners: [[290, 347], [319, 333], [290, 397]] },
-    { id: 'goodVibes', corners: [[328, 309], [401, 274], [328, 404]] },
-    { id: 'mountains', corners: [[652, 162], [724, 127], [652, 268]] },
-    { id: 'space', corners: [[750, 163], [815, 131], [750, 246]] }
+    { id: 'poster1', corners: [[237, 355], [276, 336], [237, 456]] },
+    { id: 'poster2', corners: [[290, 347], [319, 333], [290, 397]] },
+    { id: 'poster3', corners: [[328, 309], [401, 274], [328, 404]] },
+    { id: 'poster4', corners: [[652, 162], [724, 127], [652, 268]] },
+    { id: 'poster5', corners: [[750, 163], [815, 131], [750, 246]] }
   ];
   function quad([a, b, d], padding = 0) {
     const at = (u, v) => [0, 1].map(k => a[k] + u * (b[k] - a[k]) + v * (d[k] - a[k]));
@@ -78,7 +78,7 @@
       const replacement = replacements.get(id);
       if (replacement) {
         // Derive each frame's aspect ratio before applying the wall shear.
-        // The narrow sunset frame must not stretch a standard poster texture.
+        // The narrow poster1 frame must not stretch a standard poster texture.
         const height = 240 * (d[1] - a[1]) / (b[0] - a[0]);
         ctx.transform((b[0] - a[0]) / 240, (b[1] - a[1]) / 240,
           (d[0] - a[0]) / height, (d[1] - a[1]) / height, ...a);

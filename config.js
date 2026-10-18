@@ -33,9 +33,15 @@ window.CINEMA_CONFIG = {
   showCounter: true,        // ?counter=0 hides "Зрители"
   counterLabel: 'Зрители',
   signText: 'CINEMA',        // ?sign= название на вывеске; длинный текст автоматически уменьшается
-  // Independent wall posters: omitted = bundled art, null = hide, string = replacement image.
-  // Use local paths, e.g. goodVibes: 'assets/my-poster.png'. Images fit inside the existing frames.
-  posters: {},              // sunset, small, goodVibes, mountains, space
+  // Постеры слева направо. Замените файлы в assets/posters или укажите свои пути.
+  // null = скрыть постер; удалённая настройка = исходный рисунок.
+  posters: {
+    poster1: 'assets/posters/poster1.svg',
+    poster2: 'assets/posters/poster2.svg',
+    poster3: 'assets/posters/poster3.svg',
+    poster4: 'assets/posters/poster4.svg',
+    poster5: 'assets/posters/poster5.svg'
+  },
   initialEntrance: 'seated',  // ?initial=walk | seated  (how viewers present at page load appear)
 
   rememberAudience: true,   // ?remember=0 disables local audience persistence

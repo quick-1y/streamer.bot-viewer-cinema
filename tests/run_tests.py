@@ -121,21 +121,23 @@ def main():
                 sign: scene.sign.text};
         }''')
         check('decor. five posters are separate cached objects', decor['ids'] ==
-              ['sunset', 'small', 'goodVibes', 'mountains', 'space'] and decor['distinct'] == 5)
+              ['poster1', 'poster2', 'poster3', 'poster4', 'poster5'] and decor['distinct'] == 5)
         check('decor. default marquee text is CINEMA', decor['sign'] == 'CINEMA')
         custom = pg.evaluate('''async () => {
-            const before = __cinema.renderer.scene;
+            // Compare against bundled art independently of configured placeholders.
+            await VC.Decor.ready({});
+            const before = VC.buildScene();
             const replacement = document.createElement('canvas');
             replacement.width = replacement.height = 16;
             const ctx = replacement.getContext('2d');
             ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, 16, 16);
-            await VC.Decor.ready({goodVibes: replacement.toDataURL()});
-            const after = VC.buildScene({posters: {small: null}, signText: 'Мой канал'});
+            await VC.Decor.ready({poster3: replacement.toDataURL()});
+            const after = VC.buildScene({posters: {poster2: null}, signText: 'Мой канал'});
             const pixels = s => Array.from(s.image.getContext('2d')
                 .getImageData(0, 0, s.image.width, s.image.height).data);
-            const oldGood = pixels(before.posters.find(p => p.id === 'goodVibes'));
-            const newGood = pixels(after.posters.find(p => p.id === 'goodVibes'));
-            const untouched = before.posters.filter(p => !['goodVibes', 'small'].includes(p.id))
+            const oldGood = pixels(before.posters.find(p => p.id === 'poster3'));
+            const newGood = pixels(after.posters.find(p => p.id === 'poster3'));
+            const untouched = before.posters.filter(p => !['poster3', 'poster2'].includes(p.id))
                 .every(p => JSON.stringify(pixels(p)) ===
                     JSON.stringify(pixels(after.posters.find(q => q.id === p.id))));
             const b = after.bg.getContext('2d');
@@ -147,7 +149,7 @@ def main():
                 wall: wall[0] > wall[1] * 1.5 && wall[0] > wall[2] * 1.5};
         }''')
         check('decor. replacement changes only its own poster', custom['replaced'] and custom['untouched'])
-        check('decor. individual posters can be hidden', 'small' not in custom['ids'] and len(custom['ids']) == 4)
+        check('decor. individual posters can be hidden', 'poster2' not in custom['ids'] and len(custom['ids']) == 4)
         check('decor. room underneath posters is clean wall', custom['wall'])
         for label, query, expected in [
             ('short', 'MyChannel', 'MyChannel'),
