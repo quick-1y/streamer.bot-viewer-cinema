@@ -36,7 +36,7 @@ window.CINEMA_CONFIG = {
   // Постеры слева направо. Замените файлы в assets/posters или укажите свои пути.
   // null = скрыть постер; удалённая настройка = исходный рисунок.
   posters: {
-    poster1: 'assets/posters/poster1.svg',
+    poster1: 'assets/posters/poster1-alliance.svg',
     poster2: 'assets/posters/poster2.svg',
     poster3: 'assets/posters/poster3.svg',
     poster4: 'assets/posters/poster4.svg',
