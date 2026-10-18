@@ -539,7 +539,7 @@
     plant(ctx, 0.4, y + 1.35, 1.1);
     plant(ctx, 4.8, y + 1.35, 1.1);
   }
-  function entrance(ctx) {
+  function entrance(ctx, signText) {
     const y = L.D + 0.05,
       a = L.DOOR_X0,
       b = L.DOOR_X1,
@@ -564,7 +564,7 @@
       box(ctx, x, y - 0.1, 0.13, 0.25, 0, h + 0.1, '#c28e50', '#8d5534', '#422832');
     line(ctx, face(a + 0.03, h), face(b - 0.03, h), '#d3a263', 2);
     line(ctx, face(0, 4.2), face(5.3, 4.2), '#cc9551', 3);
-    // Warm lightbox and hand-rastered 5x7 lettering, projected down-right.
+    // Warm lightbox with fitted lettering, projected down-right.
     poly(
       ctx,
       [
@@ -587,33 +587,15 @@
       '#70382a',
       '#ffd381'
     );
-    const letters = {
-      C: ['01111', '11000', '11000', '11000', '11000', '11000', '01111'],
-      I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
-      N: ['10001', '11001', '11001', '10101', '10011', '10011', '10001'],
-      E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
-      M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
-      A: ['01110', '11011', '10001', '10001', '11111', '10001', '10001']
-    };
-    'CINEMA'.split('').forEach((letter, i) =>
-      letters[letter].forEach((row, j) =>
-        row.split('').forEach((v, k) => {
-          if (v === '0') return;
-          const x = 0.82 + (i * 6 + k) * 0.105,
-            z = 3.83 - j * 0.062;
-          poly(
-            ctx,
-            [
-              [x, y + 0.23, z],
-              [x + 0.089, y + 0.23, z],
-              [x + 0.089, y + 0.23, z - 0.052],
-              [x, y + 0.23, z - 0.052]
-            ],
-            '#ffe7a4'
-          );
-        })
-      )
-    );
+    const sign = VC.Decor.sign(signText);
+    const p = P(0.5, y + 0.23, 3.88),
+      q = P(4.8, y + 0.23, 3.88),
+      r = P(0.5, y + 0.23, 3.36);
+    ctx.save();
+    ctx.transform((q.x - p.x) / 640, (q.y - p.y) / 640,
+      (r.x - p.x) / 160, (r.y - p.y) / 160, p.x, p.y);
+    ctx.drawImage(sign.image, 0, 0);
+    ctx.restore();
     for (let x = 0.45; x < 5; x += 0.23)
       for (const z of [3.3, 3.95]) dot(ctx, x, y + 0.23, z, '#ffeaa1', 1);
     lantern(ctx, (x, z) => [x, y + 0.15, z], 0.57, 2.1);
@@ -770,8 +752,8 @@
     });
     return { cushion: cushion.c, back: backLayer.c, ax, ay };
   }
-  VC.buildScene = function () {
-    if (VC.Art.available) return VC.Art.scene();
+  VC.buildScene = function (opts = {}) {
+    if (VC.Art.available) return VC.Art.scene(opts);
     const bg = canvas(L.VIEW_W, L.VIEW_H),
       fg = canvas(L.VIEW_W, L.VIEW_H),
       ctx = bg.ctx;
@@ -840,7 +822,7 @@
     }
     counter(ctx);
     entranceFloor(ctx);
-    entrance(fg.ctx);
+    entrance(fg.ctx, opts.signText);
     plant(ctx, 0.7, 1.0, 1.0);
     plant(ctx, L.W - 0.7, 0.8, 1.1);
     plant(ctx, 0.65, 14.3, 0.85);

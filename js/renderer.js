@@ -16,7 +16,7 @@
     constructor(root, opts) {
       this.root = root;
       this.opts = opts;
-      this.scene = VC.buildScene();
+      this.scene = VC.buildScene(opts);
 
       this.world = document.createElement('canvas');
       this.world.className = 'world';
@@ -107,6 +107,9 @@
       const S = this.scene;
       ctx.clearRect(0, 0, L.VIEW_W, L.VIEW_H);
       ctx.drawImage(S.bg, 0, 0, L.VIEW_W, L.VIEW_H);
+      if (S.posters) S.posters.forEach((poster) => {
+        ctx.drawImage(poster.image, poster.x, poster.y, poster.w, poster.h);
+      });
       this.drawLights(time, true);
 
       const items = this.seatItems.slice();

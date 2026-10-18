@@ -5,6 +5,7 @@
   const A = (VC.Art = { images: {}, ready: null, available: false });
   const sources = {
     room: 'assets/art/cinema-room.png',
+    posters: 'assets/art/cinema-posters.png',
     chair: 'assets/art/cinema-chair.png',
     viewers: 'assets/art/viewers.png',
     viewersExtra: 'assets/art/viewers-extra.png'
@@ -80,7 +81,7 @@
     c.height = h;
     return c;
   }
-  A.scene = function () {
+  A.scene = function (opts = {}) {
     const L = VC.Layout,
       bg = canvas(1920, 1080),
       fg = canvas(1920, 1080);
@@ -90,7 +91,13 @@
     ctx.imageSmoothingQuality = 'high';
     ctx.filter = 'brightness(.9) saturate(.94)';
     // Preserve the original fine detail: no low-resolution intermediate canvas.
-    ctx.drawImage(A.images.room, 24, 12, 1872, 1054);
+    const sign = VC.Decor.sign(opts.signText);
+    // Use the identical decorated room for the background and facade mask,
+    // so the foreground cannot cover the configurable text with old pixels.
+    const room = canvas(1672, 941), roomCtx = room.getContext('2d');
+    roomCtx.drawImage(A.images.room, 0, 0);
+    VC.Decor.drawSign(roomCtx, sign);
+    ctx.drawImage(room, 24, 12, 1872, 1054);
     const F = (x, y) => ({ x: 12 + x * 0.56, y: 6 + y * 0.56 });
     // Foreground facade, including its genuine door opening. Copy the painted
     // pixels after the actors so walkers pass behind the wall and through the door.
@@ -114,7 +121,7 @@
     });
     front.closePath();
     front.clip();
-    front.drawImage(A.images.room, 12, 6, 936, 527);
+    front.drawImage(room, 12, 6, 936, 527);
     front.restore();
     front.save();
     front.scale(2, 2);
@@ -134,7 +141,8 @@
       col: '255,172,74',
       a: 0.035
     }));
-    return { bg, fg, seats: A.seats(), lights, screenGlow: F(1190, 465), illustrated: true };
+    return { bg, fg, posters: VC.Decor.posters(A.images.posters, opts.posters), sign,
+      seats: A.seats(), lights, screenGlow: F(1190, 465), illustrated: true };
   };
   A.railings = function (ctx) {
     const L = VC.Layout,

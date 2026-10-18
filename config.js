@@ -32,6 +32,10 @@ window.CINEMA_CONFIG = {
   maxSeats: 60,             // ?seats= cap (layout has 60 seats)
   showCounter: true,        // ?counter=0 hides "Зрители"
   counterLabel: 'Зрители',
+  signText: 'CINEMA',        // ?sign= название на вывеске; длинный текст автоматически уменьшается
+  // Independent wall posters: omitted = bundled art, null = hide, string = replacement image.
+  // Use local paths, e.g. goodVibes: 'assets/my-poster.png'. Images fit inside the existing frames.
+  posters: {},              // sunset, small, goodVibes, mountains, space
   initialEntrance: 'seated',  // ?initial=walk | seated  (how viewers present at page load appear)
 
   rememberAudience: true,   // ?remember=0 disables local audience persistence

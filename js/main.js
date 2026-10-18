@@ -20,6 +20,7 @@
     if (q.has('bg')) base.background = q.get('bg');
     if (q.has('seats')) base.maxSeats = num(q.get('seats'), base.maxSeats);
     if (q.has('counter')) base.showCounter = bool(q.get('counter'));
+    if (q.has('sign')) base.signText = q.get('sign');
     if (q.has('initial')) base.initialEntrance = q.get('initial');
     if (q.has('debug')) base.debug = bool(q.get('debug'));
     if (q.has('remember')) base.rememberAudience = bool(q.get('remember'));
@@ -41,6 +42,11 @@
   async function start() {
     await VC.Art.ready;
     const cfg = readConfig();
+    // Cached decoration text must be measured with the actual bundled font.
+    if (document.fonts && document.fonts.load) {
+      await document.fonts.load('700 48px "Pixelify Sans"').catch(() => {});
+    }
+    await VC.Decor.ready(cfg.posters);
     VC.log.enabled = !!cfg.debug;
     applyBackground(cfg.background);
 
@@ -48,6 +54,8 @@
     const audience = new VC.Audience({ seats, leaveGraceMs: Math.max(0, cfg.leaveGraceSeconds) * 1000 });
     const renderer = new VC.Renderer(document.getElementById('stage'), {
       showCounter: cfg.showCounter !== false,
+      signText: cfg.signText ?? 'CINEMA',
+      posters: cfg.posters,
       counterLabel: cfg.counterLabel || 'Зрители'
     });
     renderer.setSeats(seats);
