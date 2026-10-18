@@ -10,18 +10,18 @@
   const VC = window.VC;
 
   const L = {
-    VIEW_W: 480, VIEW_H: 270,     // internal pixel-art resolution (×4 = 1920×1080)
-    TW: 24, TH: 12, ZS: 12,       // tile width/height in px, px per z unit
-    OX: 222, OY: 66,              // screen position of world origin
-    W: 17.6, D: 13.4, H: 4.6,     // room size (x, y) and wall height
+    VIEW_W: 720, VIEW_H: 450,     // internal pixel-art resolution, scaled without smoothing
+    TW: 30, TH: 15, ZS: 19,       // tile width/height in px, px per z unit
+    OX: 340, OY: 124,              // screen position of world origin
+    W: 19.8, D: 17.4, H: 5.8,     // room size (x, y) and wall height
     STAGE_D: 2.1,                 // raised stage depth in front of the screen
-    SCREEN_X0: 2.4, SCREEN_X1: 15.4, SCREEN_Z0: 1.25, SCREEN_Z1: 4.05,
-    LEFT_AISLE: 1.15, CENTER_AISLE: 8.8, RIGHT_AISLE: 16.5,
-    CROSS_Y: 12.35,
-    DOOR_Y0: 11.7, DOOR_Y1: 13.0, DOOR_H: 2.35,
-    ROWS: [4.3, 6.0, 7.7, 9.4, 11.1],
-    BLOCKS: [{ x0: 2.3, n: 6 }, { x0: 9.8, n: 6 }],
-    SEAT_PITCH: 1.1,
+    SCREEN_X0: 2.15, SCREEN_X1: 17.65, SCREEN_Z0: 1.25, SCREEN_Z1: 5.15,
+    LEFT_AISLE: 1.4, CENTER_AISLE: 9.9, RIGHT_AISLE: 18.4,
+    CROSS_Y: 16.2,
+    DOOR_Y0: 15.1, DOOR_Y1: 16.7, DOOR_H: 3.0,
+    ROWS: [4.2, 6.3, 8.4, 10.5, 12.6, 14.7],
+    BLOCKS: [{ x0: 2.65, n: 5 }, { x0: 11.0, n: 5 }],
+    SEAT_PITCH: 1.5,
     WALK_OFFSET: 0.6               // walkway lies this far in front of a seat (toward the screen)
   };
 
@@ -66,7 +66,7 @@
 
   /** Higher is better: middle rows, seats toward the centre of the screen. */
   L.seatDesirability = function (s) {
-    const rowScore = [0.4, 1.0, 1.0, 0.85, 0.6][s.row] || 0.5;
+    const rowScore = [0.4, 0.85, 1.0, 1.0, 0.85, 0.6][s.row] || 0.5;
     const centreX = (L.SCREEN_X0 + L.SCREEN_X1) / 2;
     const xScore = 1 - Math.abs(s.x - centreX) / 8;
     return rowScore * 1.4 + xScore;

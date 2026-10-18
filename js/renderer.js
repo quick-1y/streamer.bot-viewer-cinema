@@ -93,10 +93,10 @@
       this.labels.width = Math.round(vw * dpr);
       this.labels.height = Math.round(vh * dpr);
       Object.assign(this.labels.style, { width: vw + 'px', height: vh + 'px' });
-      this.fontPx = VC.clamp(Math.round(scale * 4.5), 12, 34);
+      this.fontPx = VC.clamp(Math.round(scale * 7.5), 12, 34);
       this.font = `600 ${this.fontPx}px "Pixelify Sans", "Trebuchet MS", sans-serif`;
       this.widthCache = new Map();
-      if (this.counterEl) this.counterEl.style.setProperty('--u', (scale / 4).toFixed(3));
+      if (this.counterEl) this.counterEl.style.setProperty('--u', (scale / (1920 / L.VIEW_W)).toFixed(3));
     }
 
     // ------------------------------------------------------------------ frame
@@ -137,8 +137,8 @@
         // pale bounce light from the blank screen onto stage and front rows
         const g = this.scene.screenGlow;
         const grd = ctx.createRadialGradient(g.x, g.y, 4, g.x, g.y, 150);
-        grd.addColorStop(0, 'rgba(170,185,220,0.13)');
-        grd.addColorStop(1, 'rgba(170,185,220,0)');
+        grd.addColorStop(0, 'rgba(170,155,180,0.045)');
+        grd.addColorStop(1, 'rgba(170,155,180,0)');
         ctx.fillStyle = grd;
         ctx.fillRect(g.x - 150, g.y - 150, 300, 300);
       } else {
@@ -159,15 +159,16 @@
       if (!a.sprites) a.sprites = VC.buildSprites(a.appearance);
       const ctx = this.ctx;
       const sp = a.sprites;
+      const spriteScale = 1.05;
       const p = L.project(a.pos.x, a.pos.y, 0);
       let x = Math.round(p.x), y = Math.round(p.y);
       let img, flip = false, footY = sp.footY;
 
       if (a.sit >= 0.5) {
         img = sp.sit;
-        footY = 18;
+        footY = sp.sitFootY;
         const bob = (a.phase === 'seated' && (a.idleClock % a.idlePeriod) < 0.35) ? 1 : 0;
-        y = y - 5 + bob;          // sit on the cushion (z ≈ 0.42)
+        y = y - 11 + bob;          // align the seated pose with the taller upholstered chair
         flip = true;
       } else {
         const front = a.facing === 'SW' || a.facing === 'SE';
@@ -177,26 +178,17 @@
         flip = a.facing === 'SE' || a.facing === 'NE';
         y -= Math.round(a.sit * 4);
       }
-      a.screenX = x; a.screenTop = y - footY + 1;
+      a.screenX = x; a.screenTop = y - footY * spriteScale + 1;
 
-      const clip = a.pos.x < 0.05;
-      if (clip) {
-        ctx.save();
-        ctx.beginPath();
-        this.scene.doorPoly.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
-        ctx.closePath();
-        ctx.clip();
-      }
       if (flip) {
         ctx.save();
         ctx.translate(x, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(img, -Math.floor(sp.w / 2), y - footY);
+        ctx.drawImage(img, -Math.floor(sp.w * spriteScale / 2), y - footY * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
         ctx.restore();
       } else {
-        ctx.drawImage(img, x - Math.floor(sp.w / 2), y - footY);
+        ctx.drawImage(img, x - Math.floor(sp.w * spriteScale / 2), y - footY * spriteScale, sp.w * spriteScale, sp.h * spriteScale);
       }
-      if (clip) ctx.restore();
     }
 
     // ------------------------------------------------------------------ labels

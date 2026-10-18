@@ -34,7 +34,7 @@
   function applyBackground(bg) {
     const v = String(bg || 'dark').trim();
     document.documentElement.style.background =
-      v === 'transparent' ? 'transparent' : v === 'dark' ? '#0a0607' : v;
+      v === 'transparent' ? 'transparent' : v === 'dark' ? '#050407' : v;
   }
 
   function start() {
