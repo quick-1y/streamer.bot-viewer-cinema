@@ -85,7 +85,7 @@ Sources → **+** → **Browser**
 
 ## 6. Файлы
 
-```
+
 index.html               точка входа (классические скрипты → работает из file:// в OBS)
 config.js                настройки развёртывания по умолчанию
 css/overlay.css          вёрстка + счётчик
@@ -102,11 +102,11 @@ js/scene.js              статичный арт кинотеатра + ист
 js/renderer.js           композиция кадра, сортировка по глубине, метки имён, счётчик
 js/demo.js               ?demo=1 симуляция
 tests/                   mock-сервер Streamer.bot + end-to-end сценарии
-```
+
 
 ## 7. Тестирование
 
-```
+
 node tests/mock-streamerbot.js --port 8080 [--password secret --enforce]
 # откройте index.html?port=8080 и управляйте:
 curl "http://127.0.0.1:8080/set?viewers=alice,bob,carol"
@@ -115,7 +115,6 @@ curl "http://127.0.0.1:8080/drop"         # убить соединения
 curl "http://127.0.0.1:8080/malformed"    # мусорные фреймы + плохой ответ
 
 python3 tests/run_tests.py                # полный автоматизированный набор (нужны Playwright + Chromium)
-```
 
 Набор покрывает следующее:
 - Пустой и предзаполненный старт.
@@ -130,4 +129,4 @@ python3 tests/run_tests.py                # полный автоматизир�
 
 ### Быстрая проверка с реальным Streamer.bot
 Откройте `index.html?debug=1` в Chrome, нажмите F12 → Console. Вы должны увидеть `state → ready` и `viewers (connected): N`. Сравните N со списком зрителей во вкладке Viewers Streamer.bot. После следующего тика Present Viewers (≤ 1 мин по умолчанию) вы должны увидеть `viewers (PresentViewers): N`.
-```
+
