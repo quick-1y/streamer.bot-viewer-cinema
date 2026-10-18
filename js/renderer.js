@@ -185,8 +185,8 @@
         y -= Math.round(a.sit * 4);
       }
       a.screenX = x; a.screenTop = y - footY * spriteScale + 1;
-      const alpha = L.passageAlpha(a.pos);
-      a.labelVisible = alpha > 0.5 && (L.gateDistance(a.pos) < -0.3 || !L.facadeOccludes({ x: a.screenX, y: a.screenTop }));
+      const alpha = a.alpha;
+      a.labelVisible = L.gateDistance(a.pos) < -0.3 || !L.facadeOccludes({ x: a.screenX, y: a.screenTop });
       if (alpha <= 0) return;
       ctx.globalAlpha = alpha;
 
@@ -242,7 +242,7 @@
       for (let i = order.length - 1; i >= 0; i--) {
         const a = order[i];
         const lab = a._label;
-        const alpha = 1;
+        const alpha = a.alpha;
         if (alpha <= 0) continue;
         ctx.globalAlpha = alpha;
         ctx.lineWidth = Math.max(3, fh * 0.3);

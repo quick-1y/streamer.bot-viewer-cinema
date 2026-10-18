@@ -26,8 +26,12 @@
     SCREEN_X1: 17.65,
     SCREEN_Z0: 1.25,
     SCREEN_Z1: 5.15,
-    LEFT_AISLE: 1.0,
     CENTER_AISLE: 9.9,
+    // Walking line in the centre aisle. A chair on the camera side (+x) of a walker
+    // is in front of them and hides them from the feet up; its sprite reaches ~2.3
+    // tiles sideways before it only covers the shoes. So walkers keep to the left
+    // edge of the aisle, beside the block0 chairs, which are behind them.
+    CENTER_LANE: 9.5,
     RIGHT_AISLE: 18.7,
     // Behind the last row, but clear of the low entrance partition: walking at the
     // old 16.2 the painted wall cut off the walkers' legs ("sinking into the floor").
@@ -178,15 +182,6 @@
   };
   L.isOutside = (p) => L.gateDistance(p) < 0;
 
-  // Just inside the door the painted facade is thick: floor between y ≈ 16 and
-  // 18.5 lies behind the wall, which would cut walkers off at the waist as if
-  // they sank into the floor. Walkers fade out under the sign and fade back in
-  // once their legs clear the wall, as if stepping out of a dark passage.
-  L.passageAlpha = function (p) {
-    if (p.x < L.GATE.left.x - 0.8 || p.x > L.GATE.right.x + 0.8) return 1;
-    if (p.y >= 19.2 || p.y <= 16.0) return 1;
-    return p.y > 18.4 ? (p.y - 18.4) / 0.8 : Math.max(0, Math.min(1, (17.5 - p.y) / 1.5));
-  };
 
   // ---------------------------------------------------------------- seats
   L.buildSeats = function (maxSeats) {
@@ -242,9 +237,10 @@
     const next = L.seatPoint(seat.row, seat.nominalX + 1, L.WALK_OFFSET);
     const rowSlope = (next.y - walk.y) / (next.x - walk.x);
     const half = (L.BLOCKS[seat.block].n - 1) / 2;
-    let aisle;
-    if (seat.block === 0) aisle = seat.index <= half ? L.LEFT_AISLE : L.CENTER_AISLE;
-    else aisle = seat.index <= half ? L.CENTER_AISLE : L.RIGHT_AISLE;
+    // No aisle along the left wall: there the chairs would stand on the walkers'
+    // camera side, and the entrance facade cuts off their legs near the back.
+    // The whole left block is reached along its rows from the centre aisle.
+    const aisle = seat.block === 1 && seat.index > half ? L.RIGHT_AISLE : L.CENTER_LANE;
     const pts = [L.OUTSIDE, L.INSIDE, { x: L.INSIDE.x, y: L.CROSS_Y }];
     if (Math.abs(aisle - L.INSIDE.x) > 1e-6) pts.push({ x: aisle, y: L.CROSS_Y });
     pts.push({ x: aisle, y: walk.y + (aisle - walk.x) * rowSlope }, walk, { x: seat.x, y: seat.y });
