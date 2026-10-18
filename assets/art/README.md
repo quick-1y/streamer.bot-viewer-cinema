@@ -2,8 +2,26 @@
 
 Bundled, generated illustrations used by the overlay; no remote image requests at runtime.
 
-- `cinema-room.png`: transparent cutaway interior, illuminated CINEMA facade, wall lights and shadows. No people or seats are baked into this image.
+- `cinema-room-aligned.png`: displayed room. It started as the mathematically rectified bake of the original illustration and was then corrected by hand; it is now the source of truth for all calibration. Its old rugs have been removed; the two rug textures are sampled separately onto exact floor rectangles. This is a bundled PNG so OBS local-file startup requires no pixel readback or authoring dependencies.
+- `cinema-room.png`: original transparent cutaway interior, illuminated CINEMA facade, wall lights and shadows. No people or seats are baked into this image.
+- `cinema-floor.png`: authoring input for wooden floor restoration, clipped to the old carpet footprints. Existing rug textures are resampled onto exact parallelograms in the shared floor plane.
 - `cinema-chair.png`: transparent velvet chair, sampled into a cached seat layer with a floor contact shadow.
 - `viewers.png`, `viewers-extra.png`: two transparent sheets, each with four character rows and three pose columns (front, walking back, seated).
 
-`js/art.js` contains the source crop rectangles, native canvas caches, facade occlusion mask, lighting positions and stable wardrobe variants. The composition renders in 1920×1080. Movement uses logical coordinates from `js/layout.js`; its projection is calibrated against this room artwork. When replacing an image, update that calibration and inspect both seated and walking viewers, including the entrance and a full hall.
+`js/art.js` contains the source crop rectangles, native canvas caches, facade occlusion mask, lighting positions and stable wardrobe variants. The composition renders in 1920×1080. Movement uses logical coordinates from `js/layout.js`; its `FLOOR` corners (four reference points), `RUGS` rectangles, `ART_GEOMETRY` anchors, door threshold, fence endpoints and `seatPoint` row calibration follow this room artwork. When replacing an image, update that calibration and inspect both seated and walking viewers, including the entrance and a full hall.
+
+Floor calibration in room-art pixels is a projective map of the world rectangle `0..19.8 × 0..17.4` onto four corners: `(884,291)`, `(1477.1,628)`, `(907.7,923.8)`, `(293.7,577.3)` for `(0,0)`, `(W,0)`, `(W,D)`, `(0,D)`. Each corner is the intersection of two edges fitted to the painted pixels: the screen-wall base where the stage strip meets the parquet (29.6°), the inner front floor edge (29.4°), the inner right floor edge (−27.5°) and the left wall base. Rows of constant world y therefore run parallel to both the screen wall and the entrance wall, even though the artwork is not a perfect parallel projection. Fence runs keep one world coordinate constant; rugs are world rectangles sampled as an 8×8 grid of affine cells; all six seat rows use constant world y. The entrance anchors, occlusion polygons and lamp positions in `js/layout.js` and `js/art.js` are surveyed directly in this image.
+
+The original illustration contained incompatible angles (screen top about 29°, screen bottom 31°, entrance beam sections 31–33.4°). `tools/build_room_mesh.py` surveys these visible edges and builds a constrained piecewise-affine correction to common axes; `tools/bake_room_art.py` restores the old rug footprints and bakes it. The current file was hand-corrected after that bake.
+
+The hand-corrected room art still contains small inconsistencies of its own (for example the screen's upper edge is about 28° while its lower edge is 29.6°); the floor is calibrated against the floor-level edges, which is what chairs, rugs and walkers touch.
+
+The scripts below rebuild the *original automatic* correction. `tools/bake_room_art.py` overwrites `cinema-room-aligned.png` and would discard the manual corrections; if you rerun it, resurvey the floor corners, entrance polygons and lamps afterwards. They need Python, NumPy, SciPy and Pillow (not runtime requirements):
+
+```sh
+python tools/build_room_mesh.py
+python tools/bake_room_art.py
+python tests/room_mesh.py
+```
+
+After rebaking, run the browser suite as well: it measures the actual corrected wall pixels, checks the original artwork as a negative example, and exercises the transformed door in both directions.
