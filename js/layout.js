@@ -30,6 +30,25 @@
     return { x: L.OX + x * 18.55 - y * 21.274, y: L.OY + x * 10.04 + y * 9.751 - z * L.ZS };
   };
 
+  // Seat rows follow the painted carpet axes, rather than the approximate
+  // perimeter projection. Both seating blocks share one straight row direction.
+  L.seatPoint = function (row, nominalX, forward = 0) {
+    const rear = row < 3;
+    const origin = rear ? { x: 883, y: 299 } : { x: 596, y: 426 };
+    const depth = rear ? { x: -231, y: 108 } : { x: -200, y: 96 };
+    const u = 0.08 + (nominalX - 2.65) / (17 - 2.65) * 0.84;
+    const v = 0.16 + (row % 3) * 0.34 - forward / 2.1 * 0.34;
+    const artX = origin.x + u * 522 + v * depth.x;
+    const artY = origin.y + u * 325 + v * depth.y;
+    const sx = 12 + artX * 0.56 - L.OX;
+    const sy = 6 + artY * 0.56 - L.OY;
+    const det = 18.55 * 9.751 + 21.274 * 10.04;
+    return {
+      x: (sx * 9.751 + sy * 21.274) / det,
+      y: (sy * 18.55 - sx * 10.04) / det
+    };
+  };
+
   L.doorX = (L.DOOR_X0 + L.DOOR_X1) / 2;
   L.doorY = L.D;
   L.OUTSIDE = { x: L.doorX, y: L.D + 1.3 };
@@ -41,11 +60,14 @@
     L.ROWS.forEach((ry, r) => {
       L.BLOCKS.forEach((b, bi) => {
         for (let i = 0; i < b.n; i++) {
+          const nominalX = b.x0 + i * L.SEAT_PITCH;
+          const point = L.seatPoint(r, nominalX);
           seats.push({
             id: `r${r}b${bi}s${i}`,
             row: r, block: bi, index: i,
-            x: b.x0 + i * L.SEAT_PITCH,
-            y: ry,
+            nominalX,
+            x: point.x,
+            y: point.y,
             occupant: null
           });
         }
@@ -77,14 +99,16 @@
   // ---------------------------------------------------------------- routes
   /** Polyline from outside the door to the seat (last point = seat itself). */
   L.routeToSeat = function (seat) {
-    const walkY = seat.y - L.WALK_OFFSET;
+    const walk = L.seatPoint(seat.row, seat.nominalX, L.WALK_OFFSET);
+    const next = L.seatPoint(seat.row, seat.nominalX + 1, L.WALK_OFFSET);
+    const rowSlope = (next.y - walk.y) / (next.x - walk.x);
     const half = (L.BLOCKS[seat.block].n - 1) / 2;
     let aisle;
     if (seat.block === 0) aisle = seat.index <= half ? L.LEFT_AISLE : L.CENTER_AISLE;
     else aisle = seat.index <= half ? L.CENTER_AISLE : L.RIGHT_AISLE;
     const pts = [L.OUTSIDE, L.INSIDE, { x: L.LEFT_AISLE, y: L.CROSS_Y }];
     if (aisle !== L.LEFT_AISLE) pts.push({ x: aisle, y: L.CROSS_Y });
-    pts.push({ x: aisle, y: walkY }, { x: seat.x, y: walkY }, { x: seat.x, y: seat.y });
+    pts.push({ x: aisle, y: walk.y + (aisle - walk.x) * rowSlope }, walk, { x: seat.x, y: seat.y });
     return pts.map((p) => ({ x: p.x, y: p.y }));
   };
 

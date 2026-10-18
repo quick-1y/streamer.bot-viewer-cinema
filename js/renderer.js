@@ -52,7 +52,7 @@
       const items = [];
       for (const s of seats) {
         const p = L.project(s.x, s.y, 0);
-        const sx = Math.round(p.x), sy = Math.round(p.y);
+        const sx = Math.round(p.x * L.ART_SCALE) / L.ART_SCALE, sy = Math.round(p.y * L.ART_SCALE) / L.ART_SCALE;
         items.push({ depth: s.x + s.y - 0.3, kind: 'cushion', sx, sy });
         items.push({ depth: s.x + s.y + 0.36, kind: 'back', sx, sy });
       }

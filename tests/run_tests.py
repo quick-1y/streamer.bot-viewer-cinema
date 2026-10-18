@@ -357,6 +357,21 @@ def main():
         check('14h. OBS resolutions use exact 1x, 2x and 4x pixel scales', scales == [1,2,4], str(scales))
         check('14i. illustrated assets loaded and render at native 1080p', pg.evaluate(
             "VC.Art.available && __cinema.renderer.scene.illustrated && __cinema.renderer.world.width === 1920 && __cinema.renderer.world.height === 1080"))
+        geometry = pg.evaluate("""() => {
+            const seats=VC.Layout.buildSeats(60);
+            const anchors=__cinema.renderer.seatItems.filter(p=>p.kind==='back');
+            const rows=Array.from({length:6},()=>[]);
+            seats.forEach((seat,i)=>rows[seat.row].push(anchors[i]));
+            return rows.map(points=>{
+                const a=points[0],b=points[points.length-1];
+                const dx=b.sx-a.sx,dy=b.sy-a.sy,length=Math.hypot(dx,dy);
+                return {angle:Math.atan2(dy,dx)*180/Math.PI,
+                    deviation:Math.max(...points.map(p=>Math.abs(dx*(p.sy-a.sy)-dy*(p.sx-a.sx))/length))};
+            });
+        }""")
+        check('15. all six chair rows are straight and aligned with the painted floor',
+              len(geometry)==6 and all(31.5 < r['angle'] < 32.5 and r['deviation'] < .65 for r in geometry),
+              json.dumps(geometry))
         pg.close(); m.stop()
 
         browser.close()
