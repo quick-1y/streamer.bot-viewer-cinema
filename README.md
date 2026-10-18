@@ -1,155 +1,133 @@
-# Viewer Cinema — Streamer.bot OBS overlay
+```markdown
+# Viewer Cinema — оверлей Streamer.bot для OBS
 
-A pixel-art isometric cinema. Every viewer Streamer.bot reports as present gets a
-unique character that walks in through the door, finds a free seat, turns to the
-(blank) screen and sits down. When a viewer leaves, the character stands up and
-walks out. A single `В зале: N` counter shows how many are inside.
+Пиксельный изометрический кинотеатр. Каждый зритель, которого Streamer.bot сообщает как присутствующего, получает уникального персонажа, который входит через дверь, находит свободное место, поворачивается к (пустому) экрану и садится. Когда зритель уходит, персонаж встаёт и выходит. Единственный счётчик `В зале: N` показывает, сколько человек внутри.
 
-No build step and no external dependencies. It runs from a local folder in an OBS
-Browser Source. The font (Pixelify Sans, OFL) is bundled.
+Без этапа сборки и без внешних зависимостей. Работает из локальной папки в OBS Browser Source. Шрифт (Pixelify Sans, OFL) включён в комплект.
 
 ---
 
-## 1. Streamer.bot setup
+## 1. Настройка Streamer.bot
 
 1. **Servers/Clients → WebSocket Server**
-   - Turn on **Auto Start** (and start the server once).
-   - Defaults: Address `127.0.0.1`, Port `8080`, Endpoint `/`.
-   - **Authentication**: optional. If you turn it on **with "Enforce"**, put the same
-     password in the overlay (see below). With Authentication on but *not* enforced,
-     the overlay works without a password, because it only uses read-only requests.
-2. **Platforms → Twitch → Settings → Present Viewers.** This decides who counts as
-   "present":
-   - *Live Update* off (default): viewers active in chat within the threshold
-     (default 5 min) are present; the list ticks every minute.
-   - *Live Update* on: the real Twitch chatters list, refreshed every 1–10 min.
-   - Make sure the Present Viewers timer isn't disabled.
-3. Twitch must be connected in Streamer.bot (broadcaster account).
+   - Включите **Auto Start** (и запустите сервер один раз).
+   - По умолчанию: адрес `127.0.0.1`, порт `8080`, endpoint `/`.
+   - **Authentication**: необязательно. Если включите **с "Enforce"**, укажите тот же пароль в оверлее (см. ниже). При включённой аутентификации, но *не* принудительной, оверлей работает без пароля, так как использует только запросы на чтение.
+2. **Platforms → Twitch → Settings → Present Viewers.** Это определяет, кто считается "присутствующим":
+   - *Live Update* выкл. (по умолчанию): зрители, активные в чате в пределах порога (по умолчанию 5 мин), присутствуют; список обновляется каждую минуту.
+   - *Live Update* вкл.: реальный список чаттеров Twitch, обновляется каждые 1–10 мин.
+   - Убедитесь, что таймер Present Viewers не отключён.
+3. Twitch должен быть подключён в Streamer.bot (аккаунт вещателя).
 
-## 2. OBS setup
+## 2. Настройка OBS
 
 Sources → **+** → **Browser**
 
-- **Local file**: ☑, choose `index.html` from this folder
-  (or untick it and use a URL like `file:///C:/overlays/viewer-cinema/index.html?bg=transparent`).
-- **Width 1920, Height 1080**. The art scales crisply at 960×540, 1920×1080 and 3840×2160.
-- Leave **"Shutdown source when not visible"** off, so the audience persists between scenes.
-- **"Refresh browser when scene becomes active"**: leave it off. If it's on, the
-  viewers walk in again every time.
+- **Local file**: ☑, выберите `index.html` из этой папки
+  (или снимите галочку и используйте URL вроде `file:///C:/overlays/viewer-cinema/index.html?bg=transparent`).
+- **Width 1920, Height 1080**. Арт масштабируется чётко при 960×540, 1920×1080 и 3840×2160.
+- Оставьте **"Shutdown source when not visible"** выключенным, чтобы аудитория сохранялась между сценами.
+- **"Refresh browser when scene becomes active"**: оставьте выключенным. Если включено, зрители будут входить заново каждый раз.
 
-## 3. Configuration
+## 3. Конфигурация
 
-Edit `config.js` once, **or** add URL parameters per source (URL parameters win):
+Отредактируйте `config.js` один раз, **или** добавьте URL-параметры для каждого источника (URL-параметры имеют приоритет):
 
-| Parameter | Default | Meaning |
+| Параметр | По умолчанию | Значение |
 |---|---|---|
-| `host` / `port` / `endpoint` | `127.0.0.1` / `8080` / `/` | Streamer.bot WebSocket Server address |
-| `secure=1` | off | use `wss://` (remote setups behind TLS) |
-| `password=` | empty | WebSocket password (needed only when *Enforce* is on) |
-| `bg=` | `dark` | `dark`, `transparent`, or a colour such as `%23101010` |
-| `grace=` | `90` | seconds a viewer may be missing from the list before walking out (lists flicker) |
-| `poll=` | `60` | safety re-sync every N seconds; `0` = rely on events only |
-| `seats=` | `60` | seat cap (the hall has 60 seats) |
-| `initial=` | `walk` | `walk`: viewers present at load walk in. `seated`: they're already seated |
-| `hideBroadcaster=1` | off | don't seat the broadcaster |
-| `ignore=a,b,c` | common bots | accounts never seated (replaces the list in `config.js`) |
-| `counter=0` | on | hide the counter |
-| `demo=1` | off | simulated audience, no Streamer.bot needed (preview / testing) |
-| `debug=1` | off | log to the browser console only; nothing extra is drawn |
+| `host` / `port` / `endpoint` | `127.0.0.1` / `8080` / `/` | Адрес WebSocket-сервера Streamer.bot |
+| `secure=1` | выкл. | использовать `wss://` (удалённые настройки за TLS) |
+| `password=` | пусто | пароль WebSocket (нужен только при включённом *Enforce*) |
+| `bg=` | `dark` | `dark`, `transparent` или цвет вроде `%23101010` |
+| `grace=` | `90` | секунд, в течение которых зритель может отсутствовать в списке до выхода (списки мерцают) |
+| `poll=` | `60` | безопасная ресинхронизация каждые N секунд; `0` = полагаться только на события |
+| `seats=` | `60` | лимит мест (в зале 60 мест) |
+| `initial=` | `walk` | `walk`: зрители, присутствующие при загрузке, входят. `seated`: они уже сидят |
+| `hideBroadcaster=1` | выкл. | не сажать вещателя |
+| `ignore=a,b,c` | обычные боты | аккаунты, которых никогда не сажают (заменяет список в `config.js`) |
+| `counter=0` | вкл. | скрыть счётчик |
+| `demo=1` | выкл. | симулированная аудитория, Streamer.bot не нужен (предпросмотр / тестирование) |
+| `debug=1` | выкл. | логировать только в консоль браузера; ничего лишнего не рисуется |
 
-Example: `index.html?port=8080&password=hunter2&bg=transparent&grace=120`
+Пример: `index.html?port=8080&password=hunter2&bg=transparent&grace=120`
 
-Name colours: mods green, VIPs pink, subscribers cyan, the broadcaster gold, everyone else cream.
+Цвета имён: моды зелёные, VIP розовые, подписчики голубые, вещатель золотой, остальные кремовые.
 
-## 4. How it talks to Streamer.bot
+## 4. Как это общается со Streamer.bot
 
-The protocol was verified against the official `@streamerbot/client` source and
-docs.streamer.bot. It was then exercised against a protocol-faithful mock server
-(`tests/`); it has not yet been run against a live Streamer.bot instance.
+Протокол проверен по исходникам официального `@streamerbot/client` и docs.streamer.bot. Затем он был протестирован на протокольно-точном mock-сервере (`tests/`); против живого экземпляра Streamer.bot он ещё не запускался.
 
-1. Connect to `ws://host:port/endpoint` → server sends `{"request":"Hello", "info":{…}, "authentication":{salt, challenge}?}`.
-2. If a challenge is present and a password is set:
+1. Подключение к `ws://host:port/endpoint` → сервер отправляет `{"request":"Hello", "info":{…}, "authentication":{salt, challenge}?}`.
+2. Если присутствует challenge и задан пароль:
    `authentication = base64(sha256( base64(sha256(password + salt)) + challenge ))` →
    `{"request":"Authenticate","id":…,"authentication":…}`.
 3. `{"request":"Subscribe","id":…,"events":{"Twitch":["PresentViewers"]}}`
 4. `{"request":"GetActiveViewers","id":…}` → `{"status":"ok","count":N,"viewers":[{"login","display","role","subscribed",…}]}`
 
-The list is re-fetched on connect, whenever Streamer.bot fires **Twitch.PresentViewers**,
-and by a slow safety poll (default 60 s, skipped if an event refresh just happened).
-That is at most one small local request a minute.
+Список запрашивается заново при подключении, всякий раз когда Streamer.bot генерирует **Twitch.PresentViewers**, и медленным страховочным опросом (по умолчанию 60 с, пропускается, если только что было обновление по событию). Это максимум один небольшой локальный запрос в минуту.
 
-**Reliability behaviour**
-- Reconnects with exponential backoff (1 s → 30 s cap, with jitter). It never runs a tight loop.
-- A wrong password waits 60 s between attempts. The console says why.
-- If two requests in a row go unanswered, the socket is treated as half-open and rebuilt.
-- Malformed JSON, unknown frames and invalid responses are ignored. A bad reply never empties the hall.
-- While disconnected, the audience stays on screen. It reconciles when the connection returns.
+**Поведение при сбоях**
+- Переподключение с экспоненциальной задержкой (1 с → потолок 30 с, с джиттером). Никогда не запускает плотный цикл.
+- Неверный пароль: 60 с между попытками. Консоль объясняет причину.
+- Если два запроса подряд остались без ответа, сокет считается полуоткрытым и пересоздаётся.
+- Некорректный JSON, неизвестные фреймы и невалидные ответы игнорируются. Плохой ответ никогда не опустошает зал.
+- Пока соединение отсутствует, аудитория остаётся на экране. Синхронизация происходит при возврате соединения.
 
-## 5. Behaviour details
+## 5. Детали поведения
 
-- **Stable identity.** Appearance (skin, hair, clothes, hats, glasses, popcorn…) is derived
-  from the login, so the same viewer always looks the same. Seats are remembered,
-  so a returning viewer goes back to their seat when it's free.
-- **Seat choice.** Middle rows and seats near the centre are preferred. The hall fills
-  spread out, which keeps names readable.
-- **No duplicates or double booking.** One character per login and one occupant per seat.
-  A seat stays reserved until its character has actually left through the door.
-- **Simultaneous arrivals** queue at the door and enter one by one, faster when a crowd is
-  waiting. Walkers keep their distance and pass on the right in aisles.
-- **Leaving mid-walk / returning mid-exit.** The character turns around in place; there is
-  no teleporting.
-- **Full hall.** Extra viewers wait outside, unseen and not counted. They walk in as soon as
-  a seat frees up.
-- **Long streams.** One `requestAnimationFrame` loop, frame-rate independent, with `dt`
-  clamped. Sprites are cached per character and freed on exit. Seat memory is capped
-  at 500 logins. Timers and the socket are cleaned up on page hide.
+- **Стабильная идентичность.** Внешность (кожа, волосы, одежда, шляпы, очки, попкорн…) выводится из логина, поэтому один и тот же зритель всегда выглядит одинаково. Места запоминаются, поэтому вернувшийся зритель садится на своё место, когда оно свободно.
+- **Выбор места.** Предпочтительны средние ряды и места ближе к центру. Зал заполняется равномерно, что сохраняет читаемость имён.
+- **Без дубликатов и двойного бронирования.** Один персонаж на логин и один occupant на место. Место остаётся зарезервированным, пока персонаж фактически не выйдет через дверь.
+- **Одновременные прибытия** встают в очередь у двери и входят по одному, быстрее при скоплении. Идущие держат дистанцию и расходятся справа в проходах.
+- **Уход посреди ходьбы / возврат посреди выхода.** Персонаж разворачивается на месте; телепортации нет.
+- **Полный зал.** Лишние зрители ждут снаружи, невидимые и не учитываемые. Они входят, как только освобождается место.
+- **Долгие стримы.** Один цикл `requestAnimationFrame`, независимый от частоты кадров, с ограниченным `dt`. Спрайты кешируются для каждого персонажа и освобождаются при выходе. Память мест ограничена 500 логинами. Таймеры и сокет очищаются при скрытии страницы.
 
-## 6. Files
+## 6. Файлы
 
 ```
-index.html               entry point (classic scripts → works from file:// in OBS)
-config.js                deployment defaults
-css/overlay.css          layout + counter
+index.html               точка входа (классические скрипты → работает из file:// в OBS)
+config.js                настройки развёртывания по умолчанию
+css/overlay.css          вёрстка + счётчик
 fonts/                   Pixelify Sans (SIL OFL)
-js/util.js               hashing, PRNG, SHA-256 (WebCrypto + pure-JS fallback)
-js/streamerbot-client.js WebSocket, Hello/auth, requests, events, reconnect
-js/viewer-sync.js        GetActiveViewers polling policy + payload validation
-js/layout.js             world geometry, seats, walking routes, projection
-js/seats.js              seat allocation
-js/audience.js           viewer state: diffing, grace, door queue, waiting line
-js/actors.js             character movement / sitting state machine
-js/characters.js         procedural pixel-art characters
-js/scene.js              static cinema art + light sources
-js/renderer.js           frame composition, depth sorting, name labels, counter
-js/demo.js               ?demo=1 simulation
-tests/                   mock Streamer.bot server + end-to-end scenarios
+js/util.js               хеширование, PRNG, SHA-256 (WebCrypto + чистый JS fallback)
+js/streamerbot-client.js WebSocket, Hello/auth, запросы, события, переподключение
+js/viewer-sync.js        политика опроса GetActiveViewers + валидация payload
+js/layout.js             геометрия мира, места, маршруты ходьбы, проекция
+js/seats.js              распределение мест
+js/audience.js           состояние зрителей: diffing, grace, очередь у двери, очередь ожидания
+js/actors.js             движение персонажей / конечный автомат сидения
+js/characters.js         процедурные пиксель-арт персонажи
+js/scene.js              статичный арт кинотеатра + источники света
+js/renderer.js           композиция кадра, сортировка по глубине, метки имён, счётчик
+js/demo.js               ?demo=1 симуляция
+tests/                   mock-сервер Streamer.bot + end-to-end сценарии
 ```
 
-## 7. Testing
+## 7. Тестирование
 
 ```
 node tests/mock-streamerbot.js --port 8080 [--password secret --enforce]
-# open index.html?port=8080 and drive it:
+# откройте index.html?port=8080 и управляйте:
 curl "http://127.0.0.1:8080/set?viewers=alice,bob,carol"
-curl "http://127.0.0.1:8080/event"        # fire Twitch.PresentViewers
-curl "http://127.0.0.1:8080/drop"         # kill connections
-curl "http://127.0.0.1:8080/malformed"    # junk frames + bad response
+curl "http://127.0.0.1:8080/event"        # вызвать Twitch.PresentViewers
+curl "http://127.0.0.1:8080/drop"         # убить соединения
+curl "http://127.0.0.1:8080/malformed"    # мусорные фреймы + плохой ответ
 
-python3 tests/run_tests.py                # full automated suite (needs Playwright + Chromium)
+python3 tests/run_tests.py                # полный автоматизированный набор (нужны Playwright + Chromium)
 ```
 
-The suite covers the following:
-- Empty and pre-populated starts.
-- Single and 12-at-once joins.
-- Leave with grace, and leave-then-rejoin (mid-exit and after exit).
-- Connection drop, and a server restart with backoff.
-- Malformed data.
-- Capacity overflow with a waiting line.
-- Authentication: correct and wrong password, Enforce on and off.
-- A half-open socket.
-- A 75-second churn run with ~140 visitors, checking heap, queues and frame rate.
+Набор покрывает следующее:
+- Пустой и предзаполненный старт.
+- Одиночные и 12-одновременных подключений.
+- Уход с grace и уход-затем-возврат (посреди выхода и после выхода).
+- Обрыв соединения и перезапуск сервера с backoff.
+- Некорректные данные.
+- Переполнение вместимости с очередью ожидания.
+- Аутентификация: правильный и неправильный пароль, Enforce вкл. и выкл.
+- Полуоткрытый сокет.
+- 75-секундный прогон churn с ~140 посетителями, проверка кучи, очередей и частоты кадров.
 
-### Quick check with real Streamer.bot
-Open `index.html?debug=1` in Chrome, press F12 → Console. You should see `state → ready`
-and `viewers (connected): N`. Compare N with the viewer list in Streamer.bot's Viewers tab.
-After the next Present Viewers tick (≤ 1 min by default) you should see `viewers (PresentViewers): N`.
+### Быстрая проверка с реальным Streamer.bot
+Откройте `index.html?debug=1` в Chrome, нажмите F12 → Console. Вы должны увидеть `state → ready` и `viewers (connected): N`. Сравните N со списком зрителей во вкладке Viewers Streamer.bot. После следующего тика Present Viewers (≤ 1 мин по умолчанию) вы должны увидеть `viewers (PresentViewers): N`.
+```
