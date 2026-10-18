@@ -11,7 +11,7 @@
   const VC = window.VC;
   const L = VC.Layout;
 
-  const WALK_SPEED = 2.25;   // tiles / second
+  const WALK_SPEED = 3.0;    // tiles / second; keeps traversal bounded in the larger hall
   const SHUFFLE_SPEED = 1.1; // last step into the seat
   const SIT_TIME = 0.45;     // seconds to sit down / stand up
   const PERSONAL_SPACE = 0.62;
@@ -170,8 +170,8 @@
     /** Depth for painter's ordering (larger = closer to the camera). */
     get depth() { return this.pos.x + this.pos.y + 0.02; }
 
-    /** Inside the door frame? (renderer clips to the doorway) */
-    get inDoorway() { return this.pos.x < 0.35; }
+    /** Within the front entrance threshold. */
+    get inDoorway() { return this.pos.y > L.D - 0.35; }
   }
 
   VC.Actor = Actor;

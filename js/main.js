@@ -22,6 +22,7 @@
     if (q.has('counter')) base.showCounter = bool(q.get('counter'));
     if (q.has('initial')) base.initialEntrance = q.get('initial');
     if (q.has('debug')) base.debug = bool(q.get('debug'));
+    if (q.has('remember')) base.rememberAudience = bool(q.get('remember'));
     if (q.has('demo')) base.demo = bool(q.get('demo'));
     base.port = base.port || 8080;
     base.host = base.host || '127.0.0.1';
@@ -34,10 +35,11 @@
   function applyBackground(bg) {
     const v = String(bg || 'dark').trim();
     document.documentElement.style.background =
-      v === 'transparent' ? 'transparent' : v === 'dark' ? '#0a0607' : v;
+      v === 'transparent' ? 'transparent' : v === 'dark' ? '#050407' : v;
   }
 
-  function start() {
+  async function start() {
+    await VC.Art.ready;
     const cfg = readConfig();
     VC.log.enabled = !!cfg.debug;
     applyBackground(cfg.background);
@@ -46,15 +48,18 @@
     const audience = new VC.Audience({ seats, leaveGraceMs: Math.max(0, cfg.leaveGraceSeconds) * 1000 });
     const renderer = new VC.Renderer(document.getElementById('stage'), {
       showCounter: cfg.showCounter !== false,
-      counterLabel: cfg.counterLabel || 'В зале'
+      counterLabel: cfg.counterLabel || 'Зрители'
     });
     renderer.setSeats(seats);
+    const session = new VC.AudienceSession(cfg, audience);
+    session.restore();
 
     const listOpts = { ignore: cfg.ignore, hideBroadcaster: cfg.hideBroadcaster };
     let snapshots = 0;
     const onList = (list) => {
       audience.applyList(list, { initialMode: snapshots === 0 ? cfg.initialEntrance : 'walk' });
       snapshots++;
+      session.save();
     };
 
     let connection = null, sync = null, demo = null;
@@ -90,11 +95,29 @@
     }
     begin();
 
+    let saveTimer = setInterval(() => session.save(), 1000);
+    document.addEventListener('visibilitychange', () => {
+      session.save();
+      // OBS may suspend animation while hidden; reset the clock on return.
+      last = performance.now();
+      if (!document.hidden && sync && connection.state === 'ready') sync.refresh('visible');
+    });
     window.addEventListener('pagehide', () => {
+      session.save();
+      clearInterval(saveTimer);
       cancelAnimationFrame(raf);
       if (sync) sync.stop();
       if (connection) connection.stop();
       if (demo) demo.stop();
+    });
+
+    window.addEventListener('pageshow', (event) => {
+      if (!event.persisted) return;
+      if (sync) sync.start();
+      if (connection) connection.start();
+      if (cfg.demo) demo = VC.startDemo((list) => onList(VC.normalizeViewerList(list, listOpts)));
+      saveTimer = setInterval(() => session.save(), 1000);
+      begin();
     });
 
     // Read-only handle for automated tests / console inspection (nothing is rendered).

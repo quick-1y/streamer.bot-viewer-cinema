@@ -30,9 +30,11 @@ window.CINEMA_CONFIG = {
   // ---- Look ----
   background: 'dark',       // ?bg=dark | transparent | #rrggbb
   maxSeats: 60,             // ?seats= cap (layout has 60 seats)
-  showCounter: true,        // ?counter=0 hides "В зале"
-  counterLabel: 'В зале',
-  initialEntrance: 'walk',  // ?initial=walk | seated  (how viewers present at page load appear)
+  showCounter: true,        // ?counter=0 hides "Зрители"
+  counterLabel: 'Зрители',
+  initialEntrance: 'seated',  // ?initial=walk | seated  (how viewers present at page load appear)
+
+  rememberAudience: true,   // ?remember=0 disables local audience persistence
 
   // ---- Developer ----
   debug: false,             // ?debug=1   logs to the browser console only (never on screen)

@@ -27,7 +27,6 @@ html, body {
 
 #stage canvas.world {
   image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 
 #stage canvas.labels {
@@ -36,12 +35,12 @@ html, body {
   pointer-events: none;
 }
 
-/* "В зале: N" — scales with the scene (--u = 1 at 1920×1080) */
+/* "Зрители: N" — scales with the scene (--u = 1 at 1920×1080) */
 .counter {
   --u: 1;
   position: absolute;
-  left: calc(26px * var(--u));
-  top: calc(24px * var(--u));
+  right: max(18px, calc(26px * var(--u)));
+  bottom: max(18px, calc(24px * var(--u)));
   display: flex;
   align-items: center;
   gap: calc(12px * var(--u));
@@ -49,9 +48,9 @@ html, body {
   font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
   font-weight: 600;
   color: #ffe9c4;
-  background: linear-gradient(#2a140c, #1c0c07);
+  background: linear-gradient(#241925, #18121d);
   border: calc(3px * var(--u)) solid #c9772e;
-  border-radius: calc(10px * var(--u));
+  border-radius: calc(2px * var(--u));
   box-shadow:
     0 0 0 calc(3px * var(--u)) #3a1a0c,
     inset 0 0 0 calc(2px * var(--u)) #5a2c12,
@@ -80,7 +79,7 @@ html, body {
   font-size: calc(44px * var(--u));
   min-width: 1.4ch;
   text-align: right;
-  color: #fff6e0;
+  color: #ffdb86;
 }
 
 .counter.bump .value { animation: bump 0.45s ease-out; }

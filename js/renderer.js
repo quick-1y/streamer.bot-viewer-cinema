@@ -20,10 +20,11 @@
 
       this.world = document.createElement('canvas');
       this.world.className = 'world';
-      this.world.width = L.VIEW_W;
-      this.world.height = L.VIEW_H;
+      this.world.width = L.VIEW_W * L.ART_SCALE;
+      this.world.height = L.VIEW_H * L.ART_SCALE;
       this.ctx = this.world.getContext('2d');
       this.ctx.imageSmoothingEnabled = false;
+      this.ctx.scale(L.ART_SCALE, L.ART_SCALE);
 
       this.labels = document.createElement('canvas');
       this.labels.className = 'labels';
@@ -82,7 +83,7 @@
       const vw = window.innerWidth || L.VIEW_W, vh = window.innerHeight || L.VIEW_H;
       const fit = Math.min(vw / L.VIEW_W, vh / L.VIEW_H);
       const int = Math.floor(fit);
-      const scale = int >= 1 && int / fit > 0.86 ? int : fit;   // prefer crisp integer scaling
+      const scale = int >= 1 ? int : fit;   // never stretch pixels by a fractional factor at OBS sizes
       this.scale = scale;
       const cw = Math.round(L.VIEW_W * scale), ch = Math.round(L.VIEW_H * scale);
       this.offX = Math.round((vw - cw) / 2);
@@ -93,10 +94,10 @@
       this.labels.width = Math.round(vw * dpr);
       this.labels.height = Math.round(vh * dpr);
       Object.assign(this.labels.style, { width: vw + 'px', height: vh + 'px' });
-      this.fontPx = VC.clamp(Math.round(scale * 4.5), 12, 34);
+      this.fontPx = VC.clamp(Math.round(scale * 9), 12, 34);
       this.font = `600 ${this.fontPx}px "Pixelify Sans", "Trebuchet MS", sans-serif`;
       this.widthCache = new Map();
-      if (this.counterEl) this.counterEl.style.setProperty('--u', (scale / 4).toFixed(3));
+      if (this.counterEl) this.counterEl.style.setProperty('--u', (scale / (1920 / L.VIEW_W)).toFixed(3));
     }
 
     // ------------------------------------------------------------------ frame
@@ -105,25 +106,28 @@
       const ctx = this.ctx;
       const S = this.scene;
       ctx.clearRect(0, 0, L.VIEW_W, L.VIEW_H);
-      ctx.drawImage(S.bg, 0, 0);
+      ctx.drawImage(S.bg, 0, 0, L.VIEW_W, L.VIEW_H);
       this.drawLights(time, true);
 
       const items = this.seatItems.slice();
       const visible = [];
+      const outside = [];
       for (const a of audience.actors.values()) {
         if (!a.isInside()) continue;
         visible.push(a);
-        items.push({ depth: a.depth, kind: 'actor', actor: a });
+        if (a.pos.y > L.D) outside.push(a);
+        else items.push({ depth: a.depth, kind: 'actor', actor: a });
       }
       items.sort((p, q) => p.depth - q.depth);
 
       const seat = S.seats;
       for (const it of items) {
-        if (it.kind === 'cushion') ctx.drawImage(seat.cushion, it.sx - seat.ax, it.sy - seat.ay);
-        else if (it.kind === 'back') ctx.drawImage(seat.back, it.sx - seat.ax, it.sy - seat.ay);
+        if (it.kind === 'cushion') ctx.drawImage(seat.cushion, it.sx - seat.ax, it.sy - seat.ay, seat.w || seat.cushion.width, seat.h || seat.cushion.height);
+        else if (it.kind === 'back') ctx.drawImage(seat.back, it.sx - seat.ax, it.sy - seat.ay, seat.w || seat.back.width, seat.h || seat.back.height);
         else this.drawActor(it.actor);
       }
-      ctx.drawImage(S.fg, 0, 0);
+      ctx.drawImage(S.fg, 0, 0, L.VIEW_W, L.VIEW_H);
+      outside.sort((a, b) => a.depth - b.depth).forEach((a) => this.drawActor(a));
       this.drawLights(time, false);
       this.drawLabels(visible);
       this.setCount(audience.hallCount);
@@ -137,8 +141,8 @@
         // pale bounce light from the blank screen onto stage and front rows
         const g = this.scene.screenGlow;
         const grd = ctx.createRadialGradient(g.x, g.y, 4, g.x, g.y, 150);
-        grd.addColorStop(0, 'rgba(170,185,220,0.13)');
-        grd.addColorStop(1, 'rgba(170,185,220,0)');
+        grd.addColorStop(0, this.scene.illustrated ? 'rgba(170,155,180,0.012)' : 'rgba(170,155,180,0.045)');
+        grd.addColorStop(1, 'rgba(170,155,180,0)');
         ctx.fillStyle = grd;
         ctx.fillRect(g.x - 150, g.y - 150, 300, 300);
       } else {
@@ -159,44 +163,37 @@
       if (!a.sprites) a.sprites = VC.buildSprites(a.appearance);
       const ctx = this.ctx;
       const sp = a.sprites;
+      const spriteScale = sp.scale || 1.25;
       const p = L.project(a.pos.x, a.pos.y, 0);
       let x = Math.round(p.x), y = Math.round(p.y);
       let img, flip = false, footY = sp.footY;
 
       if (a.sit >= 0.5) {
         img = sp.sit;
-        footY = 18;
+        footY = sp.sitFootY;
         const bob = (a.phase === 'seated' && (a.idleClock % a.idlePeriod) < 0.35) ? 1 : 0;
-        y = y - 5 + bob;          // sit on the cushion (z ≈ 0.42)
-        flip = true;
+        y = y - (sp.seatOffset ?? 14) + bob;
+        x += sp.seatShift || 0;          // align the seated pose with the taller upholstered chair
+        flip = !sp.generated;
       } else {
         const front = a.facing === 'SW' || a.facing === 'SE';
         const set = front ? sp.front : sp.back;
         const f = a.moving ? 1 + (Math.floor(a.walkClock * 3.2) % 4) : 0;
         img = set[f];
-        flip = a.facing === 'SE' || a.facing === 'NE';
+        flip = a.facing === 'SE' || a.facing === (sp.generated ? 'NW' : 'NE');
         y -= Math.round(a.sit * 4);
       }
-      a.screenX = x; a.screenTop = y - footY + 1;
+      a.screenX = x; a.screenTop = y - footY * spriteScale + 1;
 
-      const clip = a.pos.x < 0.05;
-      if (clip) {
-        ctx.save();
-        ctx.beginPath();
-        this.scene.doorPoly.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
-        ctx.closePath();
-        ctx.clip();
-      }
       if (flip) {
         ctx.save();
         ctx.translate(x, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(img, -Math.floor(sp.w / 2), y - footY);
+        ctx.drawImage(img, -Math.floor(sp.w * spriteScale / 2), Math.round(y - footY * spriteScale), Math.round(sp.w * spriteScale), Math.round(sp.h * spriteScale));
         ctx.restore();
       } else {
-        ctx.drawImage(img, x - Math.floor(sp.w / 2), y - footY);
+        ctx.drawImage(img, x - Math.floor(sp.w * spriteScale / 2), Math.round(y - footY * spriteScale), Math.round(sp.w * spriteScale), Math.round(sp.h * spriteScale));
       }
-      if (clip) ctx.restore();
     }
 
     // ------------------------------------------------------------------ labels
@@ -239,7 +236,7 @@
       for (let i = order.length - 1; i >= 0; i--) {
         const a = order[i];
         const lab = a._label;
-        const alpha = a.pos.x < 0.4 ? VC.clamp((a.pos.x + 0.7) / 1.0, 0, 1) : 1;
+        const alpha = 1;
         if (alpha <= 0) continue;
         ctx.globalAlpha = alpha;
         ctx.lineWidth = Math.max(3, fh * 0.3);

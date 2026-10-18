@@ -3,35 +3,37 @@
  *
  *   world x → screen down-right, world y → screen down-left, z → up.
  *   The screen hangs on the back-right wall (y = 0); seats face −y.
- *   The entrance is a doorway in the back-left wall (x = 0) next to the rear cross-aisle.
+ *   The entrance faces the camera on the front-left facade (y = D).
  */
 (function () {
   'use strict';
   const VC = window.VC;
 
   const L = {
-    VIEW_W: 480, VIEW_H: 270,     // internal pixel-art resolution (×4 = 1920×1080)
-    TW: 24, TH: 12, ZS: 12,       // tile width/height in px, px per z unit
-    OX: 222, OY: 66,              // screen position of world origin
-    W: 17.6, D: 13.4, H: 4.6,     // room size (x, y) and wall height
+    VIEW_W: 960, VIEW_H: 540,
+    ART_SCALE: 2,                // artwork is composited at native 1920×1080 resolution     // internal pixel-art resolution, scaled without smoothing
+    TW: 40, TH: 20, ZS: 25.8,       // tile width/height in px, px per z unit
+    OX: 496.96, OY: 155.52,              // screen position of world origin
+    W: 19.8, D: 17.4, H: 5.8,     // room size (x, y) and wall height
     STAGE_D: 2.1,                 // raised stage depth in front of the screen
-    SCREEN_X0: 2.4, SCREEN_X1: 15.4, SCREEN_Z0: 1.25, SCREEN_Z1: 4.05,
-    LEFT_AISLE: 1.15, CENTER_AISLE: 8.8, RIGHT_AISLE: 16.5,
-    CROSS_Y: 12.35,
-    DOOR_Y0: 11.7, DOOR_Y1: 13.0, DOOR_H: 2.35,
-    ROWS: [4.3, 6.0, 7.7, 9.4, 11.1],
-    BLOCKS: [{ x0: 2.3, n: 6 }, { x0: 9.8, n: 6 }],
-    SEAT_PITCH: 1.1,
+    SCREEN_X0: 2.15, SCREEN_X1: 17.65, SCREEN_Z0: 1.25, SCREEN_Z1: 5.15,
+    LEFT_AISLE: 1.4, CENTER_AISLE: 9.9, RIGHT_AISLE: 18.4,
+    CROSS_Y: 16.2,
+    DOOR_X0: 1.2, DOOR_X1: 3.5, DOOR_H: 3.0,
+    ROWS: [4.2, 6.3, 8.4, 10.5, 12.6, 14.7],
+    BLOCKS: [{ x0: 2.65, n: 5 }, { x0: 11.0, n: 5 }],
+    SEAT_PITCH: 1.5,
     WALK_OFFSET: 0.6               // walkway lies this far in front of a seat (toward the screen)
   };
 
   L.project = function (x, y, z = 0) {
-    return { x: L.OX + (x - y) * (L.TW / 2), y: L.OY + (x + y) * (L.TH / 2) - z * L.ZS };
+    return { x: L.OX + x * 18.55 - y * 21.274, y: L.OY + x * 10.04 + y * 9.751 - z * L.ZS };
   };
 
-  L.doorY = (L.DOOR_Y0 + L.DOOR_Y1) / 2;
-  L.OUTSIDE = { x: -1.05, y: L.doorY };
-  L.INSIDE = { x: 0.55, y: L.doorY };
+  L.doorX = (L.DOOR_X0 + L.DOOR_X1) / 2;
+  L.doorY = L.D;
+  L.OUTSIDE = { x: L.doorX, y: L.D + 1.3 };
+  L.INSIDE = { x: L.doorX, y: L.D - 0.6 };
 
   // ---------------------------------------------------------------- seats
   L.buildSeats = function (maxSeats) {
@@ -66,7 +68,7 @@
 
   /** Higher is better: middle rows, seats toward the centre of the screen. */
   L.seatDesirability = function (s) {
-    const rowScore = [0.4, 1.0, 1.0, 0.85, 0.6][s.row] || 0.5;
+    const rowScore = [0.4, 0.85, 1.0, 1.0, 0.85, 0.6][s.row] || 0.5;
     const centreX = (L.SCREEN_X0 + L.SCREEN_X1) / 2;
     const xScore = 1 - Math.abs(s.x - centreX) / 8;
     return rowScore * 1.4 + xScore;

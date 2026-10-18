@@ -134,11 +134,74 @@
       return true;
     }
 
-    /** Number shown on the "В зале" counter: everyone inside who isn't on the way out. */
+    /** Number shown on the "Зрители" counter: everyone inside who isn't on the way out. */
     get hallCount() {
       let n = 0;
       for (const a of this.actors.values()) if (a.isInside() && !a.isLeaving()) n++;
       return n;
+    }
+
+    /** Minimal serializable state for OBS source reloads, excluding sprite caches. */
+    exportState() {
+      const now = performance.now();
+      return {
+        version: 1,
+        savedAt: Date.now(),
+        records: Array.from(this.records.values(), (r) => ({
+          viewer: r.viewer,
+          missingFor: r.missingSince === null ? null : Math.max(0, now - r.missingSince)
+        })),
+        actors: Array.from(this.actors.values(), (a) => ({
+          viewer: a.viewer, seat: a.seat.id, phase: a.phase,
+          s: a.s, sit: a.sit, dir: a.dir, walkClock: a.walkClock
+        })),
+        lastSeat: Array.from(this.lastSeat),
+        doorCooldown: this.doorCooldown
+      };
+    }
+
+    restoreState(state, age = 0) {
+      if (!state || state.version !== 1 || !Array.isArray(state.records) ||
+          !Array.isArray(state.actors) || state.records.length > MEMORY_LIMIT ||
+          state.actors.length > this.allocator.capacity || this.hasSnapshot) return false;
+      const viewer = (raw) => VC.normalizeViewerList([raw])[0];
+      const now = performance.now();
+      for (const r of state.records) {
+        const v = r && viewer(r.viewer);
+        if (!v || this.records.has(v.key)) continue;
+        const missingFor = Number.isFinite(r.missingFor) ? Math.max(0, r.missingFor) : 0;
+        this.records.set(v.key, { viewer: v,
+          missingSince: r.missingFor === null ? null : now - missingFor - age });
+      }
+      if (Array.isArray(state.lastSeat)) for (const pair of state.lastSeat.slice(-MEMORY_LIMIT)) {
+        if (Array.isArray(pair) && typeof pair[0] === 'string' && this.allocator.byId.has(pair[1]))
+          this.remember(pair[0], pair[1]);
+      }
+      for (const r of state.actors) {
+        const v = r && viewer(r.viewer);
+        if (!v || this.actors.has(v.key) || !['queued', 'walking', 'seated'].includes(r.phase) ||
+            !Number.isFinite(r.s) || !Number.isFinite(r.sit) || ![1, -1].includes(r.dir)) continue;
+        const preferred = this.allocator.byId.get(r.seat);
+        if (!preferred || preferred.occupant) continue;
+        const seat = this.allocator.allocate(v.key, r.seat);
+        const a = new VC.Actor(v, seat);
+        this.remember(v.key, seat.id);
+        a.s = VC.clamp(r.s, 0, a.total);
+        a.sit = VC.clamp(r.sit, 0, 1);
+        a.dir = r.dir;
+        a.phase = r.phase;
+        a.walkClock = Number.isFinite(r.walkClock) ? r.walkClock : 0;
+        if (a.phase === 'seated') a.placeSeated();
+        else a.locate();
+        this.actors.set(v.key, a);
+        if (a.phase === 'queued') this.doorQueue.push(a);
+      }
+      for (const [key, rec] of this.records) {
+        if (!this.actors.has(key)) this.admit(rec.viewer, false);
+      }
+      this.doorCooldown = Number.isFinite(state.doorCooldown) ? Math.max(0, state.doorCooldown) : 0;
+      this.hasSnapshot = true;
+      return true;
     }
 
     snapshot() {
