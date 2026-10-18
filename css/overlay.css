@@ -27,7 +27,6 @@ html, body {
 
 #stage canvas.world {
   image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 
 #stage canvas.labels {
@@ -36,12 +35,12 @@ html, body {
   pointer-events: none;
 }
 
-/* "В зале: N" — scales with the scene (--u = 1 at 1920×1080) */
+/* "Зрители: N" — scales with the scene (--u = 1 at 1920×1080) */
 .counter {
   --u: 1;
   position: absolute;
-  left: calc(26px * var(--u));
-  top: calc(24px * var(--u));
+  right: max(18px, calc(26px * var(--u)));
+  bottom: max(18px, calc(24px * var(--u)));
   display: flex;
   align-items: center;
   gap: calc(12px * var(--u));

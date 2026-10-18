@@ -51,6 +51,7 @@
 
     start() {
       if (this.state !== 'idle' && this.state !== 'stopped') return;
+      if (this.state === 'stopped') this.setState('idle');
       this.connect();
     }
 

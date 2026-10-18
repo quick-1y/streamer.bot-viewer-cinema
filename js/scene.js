@@ -22,35 +22,70 @@
     ctx.imageSmoothingEnabled = false;
     return { c, ctx };
   }
-  function path(ctx, pts) {
-    ctx.beginPath();
-    pts.forEach((q, i) => {
-      const p = P(...q);
-      const x = Math.round(p.x),
-        y = Math.round(p.y);
-      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    });
-    ctx.closePath();
-  }
-  function poly(ctx, pts, color, stroke) {
-    path(ctx, pts);
+  // Rasterize polygon edges and fills on the art grid. Canvas vector antialiasing
+  // otherwise leaves soft half-pixels even when CSS uses nearest-neighbour.
+  function pixelLine(ctx, p, q, color, width = 1) {
+    let x = Math.round(p.x),
+      y = Math.round(p.y);
+    const x1 = Math.round(q.x),
+      y1 = Math.round(q.y);
+    const dx = Math.abs(x1 - x),
+      dy = -Math.abs(y1 - y);
+    const sx = x < x1 ? 1 : -1,
+      sy = y < y1 ? 1 : -1;
+    let err = dx + dy;
     ctx.fillStyle = color;
-    ctx.fill();
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 1;
-      ctx.stroke();
+    const offset = Math.floor(width / 2);
+    for (;;) {
+      ctx.fillRect(x - offset, y - offset, width, width);
+      if (x === x1 && y === y1) break;
+      const e = 2 * err;
+      if (e >= dy) {
+        err += dy;
+        x += sx;
+      }
+      if (e <= dx) {
+        err += dx;
+        y += sy;
+      }
     }
   }
+  function poly(ctx, pts, color, stroke) {
+    rasterPolygon(
+      ctx,
+      pts.map((q) => {
+        const p = P(...q);
+        return { x: Math.round(p.x), y: Math.round(p.y) };
+      }),
+      color,
+      stroke
+    );
+  }
+  function rasterPolygon(ctx, points, color, stroke) {
+    const y0 = Math.min(...points.map((p) => p.y)),
+      y1 = Math.max(...points.map((p) => p.y));
+    ctx.fillStyle = color;
+    for (let y = y0; y < y1; y++) {
+      const hits = [],
+        scan = y + 0.5;
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i],
+          b = points[(i + 1) % points.length];
+        if ((a.y <= scan && b.y > scan) || (b.y <= scan && a.y > scan))
+          hits.push(a.x + ((scan - a.y) * (b.x - a.x)) / (b.y - a.y));
+      }
+      hits.sort((a, b) => a - b);
+      for (let i = 0; i + 1 < hits.length; i += 2) {
+        const x = Math.ceil(hits[i] - 0.5),
+          end = Math.ceil(hits[i + 1] - 0.5);
+        ctx.fillRect(x, y, end - x, 1);
+      }
+    }
+    if (stroke)
+      points.forEach((p, i) => pixelLine(ctx, p, points[(i + 1) % points.length], stroke));
+  }
   function line(ctx, a, b, color, width = 1) {
-    const p = P(...a),
-      q = P(...b);
-    ctx.beginPath();
-    ctx.moveTo(Math.round(p.x) + 0.5, Math.round(p.y) + 0.5);
-    ctx.lineTo(Math.round(q.x) + 0.5, Math.round(q.y) + 0.5);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.stroke();
+    pixelLine(ctx, P(...a), P(...b), color, width);
   }
   function dot(ctx, x, y, z, color, size = 1) {
     const p = P(x, y, z);
@@ -330,24 +365,23 @@
     line(ctx, [x - 0.23, y + 0.23, 0.39], [x + 0.23, y + 0.23, 0.39], '#c18c51');
     const p = P(x, y, 0.45),
       rnd = VC.rng(Math.round((x + y) * 83));
-    for (let i = 0; i < 15; i++) {
-      const dx = (rnd() - 0.5) * 23 * size,
-        dy = -(5 + rnd() * 19) * size;
-      ctx.strokeStyle = '#233d28';
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + dx, p.y + dy);
-      ctx.stroke();
-      const col = ['#345c30', '#557e39', '#718e3e', '#2a482b'][i % 4];
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.moveTo(p.x + dx, p.y + dy);
-      ctx.lineTo(p.x + dx * 0.35 - 3, p.y + dy * 0.5 + 1);
-      ctx.lineTo(p.x + dx * 0.4 + 3, p.y + dy * 0.6 + 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#83994b';
-      ctx.fillRect(Math.round(p.x + dx * 0.8), Math.round(p.y + dy * 0.8), 1, 2);
+    // Broad, layered leaves, with stepped edges and a lighter central vein.
+    for (let i = 0; i < 14; i++) {
+      const angle = -Math.PI + rnd() * Math.PI;
+      const length = (15 + rnd() * 16) * size;
+      const dx = Math.cos(angle) * length,
+        dy = Math.sin(angle) * length - 5;
+      const mid = { x: p.x + dx * 0.54, y: p.y + dy * 0.6 };
+      const tip = { x: Math.round(p.x + dx), y: Math.round(p.y + dy) };
+      const w = (2 + rnd() * 2) * size;
+      const points = [
+        { x: p.x, y: p.y - 2 },
+        { x: mid.x - w, y: mid.y + 2 },
+        tip,
+        { x: mid.x + w, y: mid.y - 3 }
+      ].map((q) => ({ x: Math.round(q.x), y: Math.round(q.y) }));
+      rasterPolygon(ctx, points, ['#345735', '#49733a', '#688b42', '#2a4631'][i % 4], '#253b2c');
+      pixelLine(ctx, { x: p.x, y: p.y - 1 }, tip, i % 3 ? '#759448' : '#9ba95d');
     }
   }
   function screen(ctx) {
@@ -474,69 +508,122 @@
     box(ctx, 0.12, 5.15, 0.78, 2.35, 0.62, 0.13, '#ad7040', '#75482d', '#4c2e26');
     box(ctx, 0.08, 5.15, 0.13, 2.35, 0.75, 0.8, '#b17a43', '#63422f', '#40282a');
   }
-  function entrance(ctx) {
-    const a = L.DOOR_Y0,
-      b = L.DOOR_Y1,
-      h = L.DOOR_H;
-    poly(ctx, [left(a, 0), left(b, 0), left(b, h), left(a, h)], '#1a1421');
-    poly(
-      ctx,
-      [left(a + 0.12, 0), left(b - 0.12, 0), left(b - 0.12, 1.8), left(a + 0.12, 1.8)],
-      '#4b3029'
-    );
-    for (const y of [a - 0.15, b])
-      box(ctx, -0.09, y, 0.23, 0.15, 0, h + 0.15, '#bf8848', '#76452e', '#4c2c28');
-    box(ctx, -0.1, a - 0.15, 0.25, b - a + 0.3, h, 0.18, '#c28747', '#8c5530', '#42282a');
-    // Small draped header above the doorway.
-    for (let y = a - 0.1; y < b + 0.1; y += 0.2)
-      poly(
-        ctx,
-        [left(y, h + 0.2), left(y + 0.2, h + 0.2), left(y + 0.2, h + 0.8), left(y, h + 0.8)],
-        Math.round(y * 10) % 4 ? '#8f2b35' : '#571c2c'
-      );
-    boards(ctx, -2.5, a - 0.55, 0, b + 0.65, 700);
+  // Entrance on the FRONT plane, opening toward the camera as in the reference.
+  // Floor and plants belong behind the actors; the facade masks the rear aisle.
+  function entranceFloor(ctx) {
+    const y = L.D;
+    boards(ctx, 0, y, 5.3, y + 2.1, 700);
     poly(
       ctx,
       [
-        [-2.5, b + 0.65, 0],
-        [0, b + 0.65, 0],
-        [0, b + 0.65, -0.35],
-        [-2.5, b + 0.65, -0.35]
+        [0, y + 2.1, 0],
+        [5.3, y + 2.1, 0],
+        [5.3, y + 2.1, -0.5],
+        [0, y + 2.1, -0.5]
       ],
-      '#4a2a28',
-      '#211421'
+      '#503029',
+      '#221824'
     );
-    box(ctx, -0.22, a - 0.53, 0.28, 0.2, 0, 2.8, '#9c653c', '#632f29', '#351c24');
-    box(ctx, -0.22, b + 0.43, 0.28, 0.2, 0, 2.8, '#9c653c', '#632f29', '#351c24');
-    // Project the CINEMA sign onto the plane of the entrance wall.
-    const p = P(-0.23, b + 0.5, 3.05);
-    ctx.save();
-    ctx.transform(0.9, -0.45, 0, 1, p.x, p.y);
-    ctx.fillStyle = '#261821';
-    ctx.fillRect(-3, -17, 53, 21);
-    ctx.strokeStyle = '#ba6f2e';
-    ctx.strokeRect(-3, -17, 53, 21);
-    ctx.fillStyle = '#844126';
-    ctx.fillRect(0, -14, 47, 15);
-    ctx.strokeStyle = '#ffd16c';
-    ctx.strokeRect(0, -14, 47, 15);
-    ctx.fillStyle = '#ffe4a0';
-    ctx.font = 'bold 12px "Pixelify Sans",monospace';
-    ctx.fillText('CINEMA', 3, -2);
-    for (let x = 1; x < 48; x += 4) {
-      ctx.fillStyle = '#ffcf68';
-      ctx.fillRect(x, -16, 1, 1);
-      ctx.fillRect(x, 2, 1, 1);
+    poly(
+      ctx,
+      [
+        [5.3, y, 0],
+        [5.3, y + 2.1, 0],
+        [5.3, y + 2.1, -0.5],
+        [5.3, y, -0.5]
+      ],
+      '#36232a',
+      '#221824'
+    );
+    rug(ctx, L.DOOR_X0 + 0.15, y - 0.25, L.DOOR_X1 - 0.15, y + 1.75);
+    plant(ctx, 0.4, y + 1.35, 1.1);
+    plant(ctx, 4.8, y + 1.35, 1.1);
+  }
+  function entrance(ctx) {
+    const y = L.D + 0.05,
+      a = L.DOOR_X0,
+      b = L.DOOR_X1,
+      h = L.DOOR_H;
+    const face = (x, z) => [x, y, z];
+    // Two solid side panels and a lintel leave a genuine open doorway.
+    for (const [x0, x1] of [
+      [0, a],
+      [b, 5.3]
+    ]) {
+      poly(ctx, [face(x0, 0), face(x1, 0), face(x1, 4.15), face(x0, 4.15)], '#581e2c', '#261723');
+      for (let x = x0 + 0.13; x < x1; x += 0.24) line(ctx, face(x, 0.12), face(x, 4), '#842f35', 2);
+      poly(
+        ctx,
+        [face(x0, 0.08), face(x1, 0.08), face(x1, 0.75), face(x0, 0.75)],
+        '#3d2629',
+        '#94613b'
+      );
     }
-    ctx.restore();
-    plant(ctx, -1.7, a - 0.25, 0.8);
-    plant(ctx, -1.7, b + 0.35, 0.8);
+    box(ctx, 0, y - 0.12, 5.3, 0.28, h + 0.08, 1.07, '#9c6437', '#632d2b', '#35202a');
+    for (const x of [a - 0.13, b])
+      box(ctx, x, y - 0.1, 0.13, 0.25, 0, h + 0.1, '#c28e50', '#8d5534', '#422832');
+    line(ctx, face(a + 0.03, h), face(b - 0.03, h), '#d3a263', 2);
+    line(ctx, face(0, 4.2), face(5.3, 4.2), '#cc9551', 3);
+    // Warm lightbox and hand-rastered 5x7 lettering, projected down-right.
+    poly(
+      ctx,
+      [
+        [0.25, y + 0.2, 3.25],
+        [5.05, y + 0.2, 3.25],
+        [5.05, y + 0.2, 3.99],
+        [0.25, y + 0.2, 3.99]
+      ],
+      '#251a24',
+      '#ca843c'
+    );
+    poly(
+      ctx,
+      [
+        [0.42, y + 0.21, 3.34],
+        [4.89, y + 0.21, 3.34],
+        [4.89, y + 0.21, 3.9],
+        [0.42, y + 0.21, 3.9]
+      ],
+      '#70382a',
+      '#ffd381'
+    );
+    const letters = {
+      C: ['01111', '11000', '11000', '11000', '11000', '11000', '01111'],
+      I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
+      N: ['10001', '11001', '11001', '10101', '10011', '10011', '10001'],
+      E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+      M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
+      A: ['01110', '11011', '10001', '10001', '11111', '10001', '10001']
+    };
+    'CINEMA'.split('').forEach((letter, i) =>
+      letters[letter].forEach((row, j) =>
+        row.split('').forEach((v, k) => {
+          if (v === '0') return;
+          const x = 0.82 + (i * 6 + k) * 0.105,
+            z = 3.83 - j * 0.062;
+          poly(
+            ctx,
+            [
+              [x, y + 0.23, z],
+              [x + 0.089, y + 0.23, z],
+              [x + 0.089, y + 0.23, z - 0.052],
+              [x, y + 0.23, z - 0.052]
+            ],
+            '#ffe7a4'
+          );
+        })
+      )
+    );
+    for (let x = 0.45; x < 5; x += 0.23)
+      for (const z of [3.3, 3.95]) dot(ctx, x, y + 0.23, z, '#ffeaa1', 1);
+    lantern(ctx, (x, z) => [x, y + 0.15, z], 0.57, 2.1);
+    lantern(ctx, (x, z) => [x, y + 0.15, z], 4.58, 2.1);
   }
   function railings(ctx) {
     const h = 0.62;
     for (const [a, b] of [
       [
-        [0.2, L.D - 0.12],
+        [5.5, L.D - 0.12],
         [L.W - 0.14, L.D - 0.12]
       ],
       [
@@ -557,10 +644,10 @@
     }
   }
   function seatSprites() {
-    const w = 40,
-      h = 42,
-      ax = 20,
-      ay = 33,
+    const w = 56,
+      h = 60,
+      ax = 28,
+      ay = 48,
       cushion = canvas(w, h),
       backLayer = canvas(w, h);
     function local(ctx, fn) {
@@ -657,6 +744,24 @@
         '#bd4845',
         '#381927'
       );
+      const fabric = ['#84303a', '#94353d', '#a23c41', '#a83e43', '#9c353d', '#8f2b36', '#7e2531'];
+      for (let i = 0; i < fabric.length; i++) {
+        const z = 0.52 + i * 0.105;
+        poly(
+          ctx,
+          [
+            [a + 0.12, y + 0.04, z],
+            [b - 0.13, y + 0.04, z],
+            [b - 0.13, y + 0.04, z + 0.105],
+            [a + 0.12, y + 0.04, z + 0.105]
+          ],
+          fabric[i]
+        );
+      }
+      for (const x of [-0.25, 0.23]) {
+        dot(ctx, x, y + 0.055, 0.96, '#63232e');
+        dot(ctx, x - 0.025, y + 0.055, 1.0, '#bc5550');
+      }
       line(ctx, [a + 0.13, y + 0.03, 1.36], [b - 0.14, y + 0.03, 1.36], '#df6851');
       line(ctx, [a + 0.12, y + 0.03, 0.5], [a + 0.12, y + 0.03, 1.24], '#ad3d3c');
       line(ctx, [b - 0.15, y + 0.03, 0.5], [b - 0.15, y + 0.03, 1.24], '#601d2c');
@@ -733,7 +838,8 @@
       dot(ctx, x, 1.96, 0.12, '#ffd68a', 1);
     }
     counter(ctx);
-    entrance(ctx);
+    entranceFloor(ctx);
+    entrance(fg.ctx);
     plant(ctx, 0.7, 1.0, 1.0);
     plant(ctx, L.W - 0.7, 0.8, 1.1);
     plant(ctx, 0.65, 14.3, 0.85);
@@ -744,18 +850,12 @@
       }
     railings(fg.ctx);
     lights.push({ ...P(0.65, 11.4, 1.75), r: 22, col: '255,187,89', a: 0.18 });
-    lights.push({ ...P(-0.2, L.doorY, 1), r: 23, col: '255,164,79', a: 0.16 });
-    const doorPoly = [
-      [0, L.DOOR_Y0, 0],
-      [0, L.DOOR_Y1, 0],
-      [0, L.DOOR_Y1, L.DOOR_H],
-      [0, L.DOOR_Y0, L.DOOR_H]
-    ].map((q) => P(...q));
+    for (const x of [0.57, 4.58])
+      lights.push({ ...P(x, L.D + 0.2, 2.3), r: 26, col: '255,164,79', a: 0.19 });
     return {
       bg: bg.c,
       fg: fg.c,
       seats: seatSprites(),
-      doorPoly,
       lights,
       screenGlow: P(L.W / 2, 1.5, 0.2)
     };

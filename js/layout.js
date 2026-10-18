@@ -3,22 +3,22 @@
  *
  *   world x → screen down-right, world y → screen down-left, z → up.
  *   The screen hangs on the back-right wall (y = 0); seats face −y.
- *   The entrance is a doorway in the back-left wall (x = 0) next to the rear cross-aisle.
+ *   The entrance faces the camera on the front-left facade (y = D).
  */
 (function () {
   'use strict';
   const VC = window.VC;
 
   const L = {
-    VIEW_W: 720, VIEW_H: 450,     // internal pixel-art resolution, scaled without smoothing
-    TW: 30, TH: 15, ZS: 19,       // tile width/height in px, px per z unit
-    OX: 340, OY: 124,              // screen position of world origin
+    VIEW_W: 960, VIEW_H: 540,     // internal pixel-art resolution, scaled without smoothing
+    TW: 40, TH: 20, ZS: 25,       // tile width/height in px, px per z unit
+    OX: 450, OY: 148,              // screen position of world origin
     W: 19.8, D: 17.4, H: 5.8,     // room size (x, y) and wall height
     STAGE_D: 2.1,                 // raised stage depth in front of the screen
     SCREEN_X0: 2.15, SCREEN_X1: 17.65, SCREEN_Z0: 1.25, SCREEN_Z1: 5.15,
     LEFT_AISLE: 1.4, CENTER_AISLE: 9.9, RIGHT_AISLE: 18.4,
     CROSS_Y: 16.2,
-    DOOR_Y0: 15.1, DOOR_Y1: 16.7, DOOR_H: 3.0,
+    DOOR_X0: 1.2, DOOR_X1: 3.5, DOOR_H: 3.0,
     ROWS: [4.2, 6.3, 8.4, 10.5, 12.6, 14.7],
     BLOCKS: [{ x0: 2.65, n: 5 }, { x0: 11.0, n: 5 }],
     SEAT_PITCH: 1.5,
@@ -29,9 +29,10 @@
     return { x: L.OX + (x - y) * (L.TW / 2), y: L.OY + (x + y) * (L.TH / 2) - z * L.ZS };
   };
 
-  L.doorY = (L.DOOR_Y0 + L.DOOR_Y1) / 2;
-  L.OUTSIDE = { x: -1.05, y: L.doorY };
-  L.INSIDE = { x: 0.55, y: L.doorY };
+  L.doorX = (L.DOOR_X0 + L.DOOR_X1) / 2;
+  L.doorY = L.D;
+  L.OUTSIDE = { x: L.doorX, y: L.D + 1.3 };
+  L.INSIDE = { x: L.doorX, y: L.D - 0.6 };
 
   // ---------------------------------------------------------------- seats
   L.buildSeats = function (maxSeats) {

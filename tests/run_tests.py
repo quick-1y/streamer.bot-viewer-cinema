@@ -73,7 +73,7 @@ def all_seated(s, n=None):
 
 
 def open_page(browser, port, **params):
-    q = {'port': port, 'poll': 0, 'grace': 2, 'debug': 0}
+    q = {'port': port, 'poll': 0, 'grace': 2, 'debug': 0, 'initial': 'walk'}
     q.update(params)
     url = PAGE + '?' + '&'.join(f'{k}={v}' for k, v in q.items())
     pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
@@ -121,7 +121,7 @@ def main():
               f"state={s['connection']} requests={st['requests']}")
         check('1b. subscribes to Twitch.PresentViewers once and fetches once', st['requests'].get('Subscribe') == 1 and st['requests'].get('GetActiveViewers') == 1)
         counter = pg.evaluate("document.querySelector('.counter').textContent")
-        check('1c. counter shows "В зале: 0"', counter.replace(' ', ' ').strip() == 'В зале:0' or 'В зале' in counter and counter.strip().endswith('0'), repr(counter))
+        check('1c. counter shows "Зрители: 0"', counter.replace(' ', ' ').strip() == 'Зрители:0' or 'Зрители' in counter and counter.strip().endswith('0'), repr(counter))
 
         # ---------------------------------------------------------------- 3. one viewer joins
         m.set(['alice']); m.ctl('/event')
@@ -303,6 +303,59 @@ def main():
         check('13d. frame rate healthy', fps > 40, f'{fps:.0f} fps (headless)')
         pg.close()
         m.stop()
+
+        # ---------------------------------------------------------------- 14. OBS source lifecycle / local continuity
+        m = Mock(18086)
+        m.set(names('persist', 8))
+        pg = open_page(browser, 18086, initial='seated')
+        good, s = wait_for(pg, lambda s: all_seated(s, 8), 8)
+        seats_before = {a['key']: a['seat'] for a in s['seats']}
+        pg.reload()
+        good, s = wait_for(pg, lambda s: s['connection'] == 'ready' and all_seated(s, 8), 8)
+        check('14. source reload restores seated viewers without entrance replay', good and
+              {a['key']: a['seat'] for a in s['seats']} == seats_before and s['doorQueue'] == 0)
+        stats_before = m.ctl('/stats')['connections']
+        pg.evaluate("""() => {
+            dispatchEvent(new PageTransitionEvent('pagehide', {persisted:true}));
+            dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true}));
+        }""")
+        good, s = wait_for(pg, lambda s: s['connection'] == 'ready' and m.ctl('/stats')['connections'] > stats_before, 8)
+        check('14b. suspended page resumes WebSocket and keeps the audience seated', good and all_seated(s, 8))
+        m.set(names('persist', 8) + ['newarrival']); m.ctl('/event')
+        good, s = wait_for(pg, lambda s: s['actors'] == 9, 5)
+        check('14c. genuinely new viewers still enter through the door', good and
+              next(a for a in s['seats'] if a['key'] == 'newarrival')['phase'] != 'seated')
+        time.sleep(2)
+        walking = pg.evaluate("({s: __cinema.audience.actors.get('newarrival').s, seat: __cinema.audience.actors.get('newarrival').seat.id})")
+        pg.reload()
+        good, s = wait_for(pg, lambda s: s['actors'] == 9, 5)
+        resumed = pg.evaluate("({s: __cinema.audience.actors.get('newarrival').s, seat: __cinema.audience.actors.get('newarrival').seat.id})")
+        check('14d. mid-walk reload preserves route progress and reserved seat', good and
+              resumed['seat'] == walking['seat'] and resumed['s'] >= walking['s'] - .1)
+        # Malformed local state must fall back to the configured initial mode.
+        pg.add_init_script("Object.keys(localStorage).forEach(k => localStorage.setItem(k, '{broken'))")
+        pg.reload()
+        good, s = wait_for(pg, lambda s: s['connection'] == 'ready' and all_seated(s, 9), 8)
+        check('14e. corrupt browser storage cannot break startup', good)
+        pg.close()
+        # Separate page context: deny storage to model restrictive CEF settings.
+        pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
+        pg.add_init_script("Storage.prototype.getItem = Storage.prototype.setItem = function() { throw new DOMException('Denied', 'SecurityError'); }")
+        pg.goto(PAGE + '?port=18086&poll=0')
+        pg.wait_for_function('window.__cinema !== undefined')
+        good, s = wait_for(pg, lambda s: all_seated(s, 9), 8)
+        check('14f. storage denial uses seated startup without replaying existing viewers', good)
+        counter = pg.locator('.counter').bounding_box()
+        check('14g. counter says Зрители and stays in the bottom-right corner',
+              pg.locator('.counter').inner_text().startswith('Зрители:') and
+              counter['x'] > 1400 and counter['y'] > 900)
+        scales = []
+        for w, h in [(960,540),(1920,1080),(3840,2160)]:
+            pg.set_viewport_size({'width':w,'height':h})
+            pg.evaluate('() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))')
+            scales.append(pg.evaluate('__cinema.renderer.scale'))
+        check('14h. OBS resolutions use exact 1x, 2x and 4x pixel scales', scales == [1,2,4], str(scales))
+        pg.close(); m.stop()
 
         browser.close()
 
