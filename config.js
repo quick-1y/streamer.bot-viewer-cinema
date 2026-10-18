@@ -32,7 +32,7 @@ window.CINEMA_CONFIG = {
   maxSeats: 60,             // ?seats= cap (layout has 60 seats)
   showCounter: true,        // ?counter=0 hides "Зрители"
   counterLabel: 'Зрители',
-  signText: 'CINEMA',        // ?sign= название на вывеске; длинный текст автоматически уменьшается
+  signText: 'EreinTV',        // ?sign= название на вывеске; длинный текст автоматически уменьшается
   // Постеры слева направо. Замените файлы в assets/posters или укажите свои пути.
   // null = скрыть постер; удалённая настройка = исходный рисунок.
   posters: {
