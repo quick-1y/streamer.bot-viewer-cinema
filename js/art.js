@@ -185,10 +185,10 @@
     front.restore();
     // Painted lamp positions in the displayed room art.
     const lights = [
-      [279, 412],
+      [279, 420],
       [431, 299],
       [615, 207],
-      [775, 115],
+      [737, 161], // clear of the cornice, in the gap between poster slots 4 and 5
       [197, 548],
       [396, 645],
       [517, 317]
