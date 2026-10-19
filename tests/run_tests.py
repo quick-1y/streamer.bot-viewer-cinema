@@ -120,19 +120,23 @@ def main():
                 distinct: new Set(scene.posters.map(p => p.image)).size,
                 sign: scene.sign.text, configuredSign: window.CINEMA_CONFIG.signText ?? 'CINEMA'};
         }''')
-        check('decor. five posters are separate cached objects', decor['ids'] ==
-              ['poster1', 'poster2', 'poster3', 'poster4', 'poster5'] and decor['distinct'] == 5)
+        check('decor. default room has no posters or frames', decor['ids'] == [] and decor['distinct'] == 0)
         check('decor. marquee uses configured text', decor['sign'] == decor['configuredSign'])
         custom = pg.evaluate('''async () => {
-            // Compare against bundled art independently of configured placeholders.
-            await VC.Decor.ready({});
-            const before = VC.buildScene();
+            const sources = {};
+            for (let i=1;i<=5;i++) {
+                const c=document.createElement('canvas');c.width=24;c.height=32;
+                const ctx=c.getContext('2d');ctx.fillStyle=['#cc2211','#2233cc','#ddaa22','#8844bb','#11aabb'][i-1];
+                ctx.fillRect(0,0,c.width,c.height);sources['poster'+i]=c.toDataURL();
+            }
+            await VC.Decor.ready(sources);
+            const before = VC.buildScene({posters:sources});
             const replacement = document.createElement('canvas');
             replacement.width = replacement.height = 16;
             const ctx = replacement.getContext('2d');
             ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, 16, 16);
-            await VC.Decor.ready({poster3: replacement.toDataURL()});
-            const after = VC.buildScene({posters: {poster2: null}, signText: 'Мой канал'});
+            await VC.Decor.ready({...sources,poster3: replacement.toDataURL()});
+            const after = VC.buildScene({posters: {...sources,poster2: null}, signText: 'Мой канал'});
             const pixels = s => Array.from(s.image.getContext('2d')
                 .getImageData(0, 0, s.image.width, s.image.height).data);
             const oldGood = pixels(before.posters.find(p => p.id === 'poster3'));
@@ -144,10 +148,17 @@ def main():
             // This point falls inside the old Good Vibes artwork; the room itself
             // must now contain red wall, even when no poster object is drawn.
             const wall = b.getImageData(450, 390, 1, 1).data;
-            return {ids: after.posters.map(p => p.id), untouched,
+            await VC.Decor.ready({poster3:'data:image/png;base64,bm90LWFuLWltYWdl'});
+            const invalid=VC.buildScene().posters.length===0;
+            await VC.Decor.ready({});
+            const empty=VC.buildScene().posters.length===0;
+            return {ids: after.posters.map(p => p.id), untouched, invalid, empty,
+                distinct:before.posters.length===5&&new Set(before.posters.map(p=>p.image)).size===5,
                 replaced: JSON.stringify(oldGood) !== JSON.stringify(newGood),
                 wall: wall[0] > wall[1] * 1.5 && wall[0] > wall[2] * 1.5};
         }''')
+        check('decor. five custom posters use the original independent slots', custom['distinct'])
+        check('decor. omitted or broken images leave slots empty', custom['empty'] and custom['invalid'])
         check('decor. replacement changes only its own poster', custom['replaced'] and custom['untouched'])
         check('decor. individual posters can be hidden', 'poster2' not in custom['ids'] and len(custom['ids']) == 4)
         check('decor. room underneath posters is clean wall', custom['wall'])

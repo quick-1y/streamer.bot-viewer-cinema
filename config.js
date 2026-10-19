@@ -39,14 +39,14 @@ window.CINEMA_CONFIG = {
     rug1: 'assets/art/rug-1.png',
     rug2: 'assets/art/rug-2.png'
   },
-  // Постеры слева направо. Замените файлы в assets/posters или укажите свои пути.
-  // null = скрыть постер; удалённая настройка = исходный рисунок.
+  // Пять мест для своих постеров слева направо. Укажите путь к PNG/JPG/SVG.
+  // null, отсутствующая настройка или ошибка загрузки = пустая стена.
   posters: {
-    poster1: 'assets/posters/poster1-alliance.svg',
-    poster2: 'assets/posters/poster2.svg',
-    poster3: 'assets/posters/poster3.svg',
-    poster4: 'assets/posters/poster4.svg',
-    poster5: 'assets/posters/poster5.svg'
+    poster1: null,
+    poster2: null,
+    poster3: null,
+    poster4: null,
+    poster5: null
   },
   initialEntrance: 'seated',  // ?initial=walk | seated  (how viewers present at page load appear)
 

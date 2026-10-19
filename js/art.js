@@ -5,7 +5,6 @@
   const A = (VC.Art = { images: {}, ready: null, available: false });
   const sources = {
     alignedRoom: 'assets/art/cinema-room-aligned.png',
-    decorBackground: 'assets/art/decor-clean-atlas.png',
     rug1: 'assets/art/rug-1.png',
     rug2: 'assets/art/rug-2.png',
     chair: 'assets/art/cinema-chair.png',
@@ -115,7 +114,6 @@
   A.room = function () {
     const room=canvas(1672,941);
     room.getContext('2d').drawImage(A.images.alignedRoom,0,0);
-    VC.Decor.cleanRoom(room.getContext('2d'), A.images.decorBackground);
     return room;
   };
   A.rugs = function (ctx) {
@@ -205,7 +203,7 @@
       room,
       fg,
       lintel,
-      posters: VC.Decor.posters(A.images.alignedRoom, opts.posters),
+      posters: VC.Decor.posters(opts.posters),
       sign,
       seats: A.seats(),
       lights,
