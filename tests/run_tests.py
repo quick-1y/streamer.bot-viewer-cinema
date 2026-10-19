@@ -118,21 +118,25 @@ def main():
             const scene = __cinema.renderer.scene;
             return {ids: scene.posters.map(p => p.id),
                 distinct: new Set(scene.posters.map(p => p.image)).size,
-                sign: scene.sign.text};
+                sign: scene.sign.text, configuredSign: window.CINEMA_CONFIG.signText ?? 'CINEMA'};
         }''')
-        check('decor. five posters are separate cached objects', decor['ids'] ==
-              ['poster1', 'poster2', 'poster3', 'poster4', 'poster5'] and decor['distinct'] == 5)
-        check('decor. default marquee text is CINEMA', decor['sign'] == 'CINEMA')
+        check('decor. default room has no posters or frames', decor['ids'] == [] and decor['distinct'] == 0)
+        check('decor. marquee uses configured text', decor['sign'] == decor['configuredSign'])
         custom = pg.evaluate('''async () => {
-            // Compare against bundled art independently of configured placeholders.
-            await VC.Decor.ready({});
-            const before = VC.buildScene();
+            const sources = {};
+            for (let i=1;i<=5;i++) {
+                const c=document.createElement('canvas');c.width=24;c.height=32;
+                const ctx=c.getContext('2d');ctx.fillStyle=['#cc2211','#2233cc','#ddaa22','#8844bb','#11aabb'][i-1];
+                ctx.fillRect(0,0,c.width,c.height);sources['poster'+i]=c.toDataURL();
+            }
+            await VC.Decor.ready(sources);
+            const before = VC.buildScene({posters:sources});
             const replacement = document.createElement('canvas');
             replacement.width = replacement.height = 16;
             const ctx = replacement.getContext('2d');
             ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, 16, 16);
-            await VC.Decor.ready({poster3: replacement.toDataURL()});
-            const after = VC.buildScene({posters: {poster2: null}, signText: 'Мой канал'});
+            await VC.Decor.ready({...sources,poster3: replacement.toDataURL()});
+            const after = VC.buildScene({posters: {...sources,poster2: null}, signText: 'Мой канал'});
             const pixels = s => Array.from(s.image.getContext('2d')
                 .getImageData(0, 0, s.image.width, s.image.height).data);
             const oldGood = pixels(before.posters.find(p => p.id === 'poster3'));
@@ -144,10 +148,17 @@ def main():
             // This point falls inside the old Good Vibes artwork; the room itself
             // must now contain red wall, even when no poster object is drawn.
             const wall = b.getImageData(450, 390, 1, 1).data;
-            return {ids: after.posters.map(p => p.id), untouched,
+            await VC.Decor.ready({poster3:'data:image/png;base64,bm90LWFuLWltYWdl'});
+            const invalid=VC.buildScene().posters.length===0;
+            await VC.Decor.ready({});
+            const empty=VC.buildScene().posters.length===0;
+            return {ids: after.posters.map(p => p.id), untouched, invalid, empty,
+                distinct:before.posters.length===5&&new Set(before.posters.map(p=>p.image)).size===5,
                 replaced: JSON.stringify(oldGood) !== JSON.stringify(newGood),
                 wall: wall[0] > wall[1] * 1.5 && wall[0] > wall[2] * 1.5};
         }''')
+        check('decor. five custom posters use the original independent slots', custom['distinct'])
+        check('decor. omitted or broken images leave slots empty', custom['empty'] and custom['invalid'])
         check('decor. replacement changes only its own poster', custom['replaced'] and custom['untouched'])
         check('decor. individual posters can be hidden', 'poster2' not in custom['ids'] and len(custom['ids']) == 4)
         check('decor. room underneath posters is clean wall', custom['wall'])
@@ -168,6 +179,64 @@ def main():
             check('decor. ' + label + ' marquee fits its panel', fitted['text'] == expected and
                   fitted['width'] <= 592.001 and fitted['height'] <= 128.001 and
                   fitted['visible'] == bool(expected))
+        pg.close()
+
+        # ---------------------------------------------------------------- independent rug textures
+        pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
+        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.wait_for_function('window.__cinema !== undefined')
+        rugs = pg.evaluate('''async () => {
+            const render = () => {
+                const c = document.createElement('canvas'); c.width=1920; c.height=1080;
+                VC.Art.rugs(c.getContext('2d')); return c;
+            };
+            const sample = (c,index) => {
+                const r=VC.Layout.RUGS[index],p=VC.Layout.floorArt((r.x0+r.x1)/2,(r.y0+r.y1)/2);
+                return Array.from(c.getContext('2d').getImageData(
+                    Math.round(24+p[0]*1872/1672),Math.round(12+p[1]*1054/941),1,1).data);
+            };
+            await VC.Art.configureRugs({});
+            const baseline=render(), replacement=document.createElement('canvas');
+            replacement.width=32;replacement.height=16;
+            const ctx=replacement.getContext('2d');ctx.fillStyle='#00ff00';ctx.fillRect(0,0,32,16);
+            const custom=replacement.toDataURL();
+            await VC.Art.configureRugs({rug1:custom});
+            const changed=render();
+            const independent=JSON.stringify(sample(changed,1))===JSON.stringify(sample(baseline,1));
+            const green=sample(changed,0);
+            await VC.Art.configureRugs({rug1:custom,rug2:null});
+            const hidden=render();
+            await VC.Art.configureRugs({rug1:'data:image/png;base64,bm90LWFuLWltYWdl'});
+            const fallback=render().toDataURL()===baseline.toDataURL();
+            await VC.Art.configureRugs({rug1:null,rug2:null});
+            const empty=render(), pixels=empty.getContext('2d').getImageData(0,0,1920,1080).data;
+            return {independent,green,custom,hidden:sample(hidden,1)[3]===0,
+                fallback,empty:!pixels.some((v,i)=>i%4===3&&v>0)};
+        }''')
+        check('rugs. custom rectangular image replaces only the selected rug',
+              rugs['independent'] and rugs['green'] == [0, 255, 0, 255])
+        check('rugs. null hides individual rugs or both rugs', rugs['hidden'] and rugs['empty'])
+        check('rugs. invalid custom image falls back to bundled texture', rugs['fallback'])
+        pg.close()
+
+        pg = browser.new_page()
+        custom_config = (ROOT / 'config.js').read_text() + '\nCINEMA_CONFIG.rugs = ' + json.dumps(
+            {'rug1': rugs['custom'], 'rug2': None}) + ';'
+        pg.route('**/config.js', lambda route: route.fulfill(
+            body=custom_config, content_type='text/javascript'))
+        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.wait_for_function('window.__cinema !== undefined')
+        configured = pg.evaluate('''() => {
+            const c=document.createElement('canvas');c.width=1920;c.height=1080;
+            const ctx=c.getContext('2d');VC.Art.rugs(ctx);
+            return VC.Layout.RUGS.map(r=>{
+                const p=VC.Layout.floorArt((r.x0+r.x1)/2,(r.y0+r.y1)/2);
+                return Array.from(ctx.getImageData(Math.round(24+p[0]*1872/1672),
+                    Math.round(12+p[1]*1054/941),1,1).data);
+            });
+        }''')
+        check('rugs. startup applies custom image and hidden rug from config.js',
+              configured[0] == [0, 255, 0, 255] and configured[1][3] == 0)
         pg.close()
 
         # ---------------------------------------------------------------- 1. empty list
@@ -451,17 +520,38 @@ def main():
                 const sx=(p.sx-12)*1672/936-a[0],sy=(p.sy-6)*941/527-a[1];
                 return ((b[0]-a[0])*sy-(b[1]-a[1])*sx)/length;
             });
-            return {rugs,rails,gap:Math.min(...gaps)};
+            // Conservative support rectangles for the two painted feet in the
+            // cached 100x100 chair texture, rather than just the seat anchors.
+            const footCorners=[[18,65],[34,65],[34,75],[18,75],
+                [60,82],[75,82],[75,92],[60,92]];
+            const sprite=__cinema.renderer.scene.seats;
+            const feet=L.buildSeats(60).every(seat=>{
+                const rug=L.RUGS[seat.row<3?0:1],p=L.project(seat.x,seat.y);
+                const sx=Math.round(p.x*L.ART_SCALE)/L.ART_SCALE;
+                const sy=Math.round(p.y*L.ART_SCALE)/L.ART_SCALE;
+                return footCorners.every(([u,v])=>{
+                    const x=sx-sprite.ax+u*sprite.w/100;
+                    const y=sy-sprite.ay+v*sprite.h/100;
+                    const point=L.fromArt((x-12)*1672/936,(y-6)*941/527);
+                    return point.x>=rug.x0&&point.x<=rug.x1&&point.y>=rug.y0&&point.y<=rug.y1;
+                });
+            });
+            return {rugs,rails,feet,gap:Math.min(...gaps)};
         }""")
         check('15b. rugs sit on exact floor rectangles and both fence runs follow the painted floor edges',
               plane['rugs'] and plane['rails'],json.dumps(plane))
+        check('15b2. all 60 chairs have both painted feet fully inside their rug', plane['feet'])
         check('15c. first chair row has at least 110 source pixels of perpendicular screen-wall clearance',
               plane['gap']>=110,json.dumps(plane))
-        wall_pixels = pg.evaluate("""() => {
+        wall_pixels = pg.evaluate("""async () => {
             const measure = """ + (ROOT / 'tests' / 'wall_pixels.js').read_text() + """;
             const original=document.createElement('canvas');
             original.width=1672;original.height=941;
-            original.getContext('2d').drawImage(VC.Art.images.room,0,0);
+            // Only the four edge strips are needed for the negative control.
+            const fixture = new Image();
+            fixture.src = 'tests/fixtures/wall-angle-negative.png';
+            await fixture.decode();
+            original.getContext('2d').drawImage(fixture,0,0);
             // Search bands around the painted screen-wall base (stage strip → parquet)
             // and the front floor edge; the angles come from the rendered pixels.
             const guides=[{name:'screen-wall-base',target:[[960,350.9],[1380,589.1]]},
@@ -488,10 +578,15 @@ def main():
         masks = pg.evaluate("""() => {
             const scene=__cinema.renderer.scene, fg=scene.fg.getContext('2d'), header=scene.lintel.getContext('2d');
             const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(x,y);return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
-            return {opening:alpha(fg,298,620),wall:alpha(fg,440,690),header:alpha(header,300,500)};
+            return {opening:alpha(fg,298,620),wall:alpha(fg,440,690),header:alpha(header,300,500),
+                corner:alpha(fg,430,626),cornerHeader:alpha(header,430,626),
+                formerCorner:alpha(fg,430,600),beyondWall:alpha(fg,490,700)};
         }""")
         check('16. doorway stays open while facade and lintel occlude the actor',
               masks['opening']==0 and masks['wall']>240 and masks['header']>240, json.dumps(masks))
+        check('16a. straight right cap occludes viewers without a raised corner',
+              masks['corner']>240 and masks['cornerHeader']>240 and masks['formerCorner']==0 and
+              masks['beyondWall']==0, json.dumps(masks))
         rails = pg.evaluate("""() => {
             const caps=[];const ctx={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},fillRect(x,y){caps.push([x,y]);}};
             VC.Art.railings(ctx);

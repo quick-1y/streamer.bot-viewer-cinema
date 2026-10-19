@@ -93,10 +93,9 @@
     return { x: (a * x + b * y + c) / w * L.W, y: (d * x + e * y + f) / w * L.D };
   };
   L.RUGS = [
-    { x0: 1.6, x1: 18.3, y0: 3.2, y1: 8.6,
-      source: [[883,299],[1403,618],[1176,733],[653,410]] },
-    { x0: 1.6, x1: 18.3, y0: 9.7, y1: 15.5,
-      source: [[596,426],[1118,751],[899,862],[395,520]] }
+    // Cover the painted chair feet, which extend left/forward of each seat anchor.
+    { x0: 0.55, x1: 17.9, y0: 2.8, y1: 8.6 },
+    { x0: 0.55, x1: 17.9, y0: 9.4, y1: 15.5 }
   ];
   L.rugCorners = (r) => [[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]]
     .map(([x,y]) => L.floorArt(x,y));
@@ -114,10 +113,10 @@
       [157, 466],
       [210, 441],
       [398, 534],
-      [398, 584],
-      [531, 649],
-      [531, 769],
-      [513, 779],
+      [398, 597],
+      [452, 628],
+      [452, 766],
+      [440, 773],
       [357, 722],
       [240, 652],
       [228, 660],
@@ -126,10 +125,10 @@
     lintel: [
       [210, 441],
       [398, 534],
-      [398, 584],
-      [531, 649],
-      [531, 672],
-      [398, 607],
+      [398, 597],
+      [452, 628],
+      [452, 645],
+      [398, 614],
       [357, 588],
       [237, 530],
       [210, 514]
@@ -156,7 +155,7 @@
     (L.artContains(L.ART_GEOMETRY.facade, point) && !L.artContains(L.ART_GEOMETRY.opening, point));
 
   // Seats share the same plane as the rugs and railings. The first row is
-  // 4.1 tiles from the screen wall; the carpet starts 3.2 tiles from it.
+  // 4.1 tiles from the screen wall; the carpet starts 2.8 tiles from it.
   L.seatPoint = function (row, nominalX, forward = 0) {
     return { x: nominalX, y: L.ROWS[row] - forward };
   };

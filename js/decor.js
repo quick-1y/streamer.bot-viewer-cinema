@@ -4,7 +4,7 @@
   const VC = window.VC;
   const D = (VC.Decor = {});
   // Corners in the original 1672×941 artwork: top-left, top-right, bottom-left.
-  // The frames remain part of each object, rather than part of the room.
+  // Empty slots are bare wall; custom images receive their own generated frames.
   D.slots = [
     { id: 'poster1', corners: [[237, 355], [276, 336], [237, 456]] },
     { id: 'poster2', corners: [[290, 347], [319, 333], [290, 397]] },
@@ -12,26 +12,6 @@
     { id: 'poster4', corners: [[652, 162], [724, 127], [652, 268]] },
     { id: 'poster5', corners: [[750, 163], [815, 131], [750, 246]] }
   ];
-  function quad([a, b, d], padding = 0) {
-    const at = (u, v) => [0, 1].map(k => a[k] + u * (b[k] - a[k]) + v * (d[k] - a[k]));
-    return [[-padding, -padding], [1 + padding, -padding],
-      [1 + padding, 1 + padding], [-padding, 1 + padding]].map(p => at(...p));
-  }
-  D.cleanRoom = function (ctx, clean) {
-    const patches = D.slots.map(s => quad(s.corners, .035));
-    patches.push(quad([[243, 486], [349, 546], [243, 518]]));
-    // Replace only decoration footprints; preserve the hand-calibrated room,
-    // floor, walls, door, lamps and silhouette pixel for pixel everywhere else.
-    for (const points of patches) {
-      ctx.save();
-      ctx.beginPath();
-      points.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p));
-      ctx.closePath();
-      ctx.clip();
-      ctx.drawImage(clean, 0, 0);
-      ctx.restore();
-    }
-  };
   const replacements = new Map();
   D.ready = async function (config = {}) {
     replacements.clear();
@@ -47,7 +27,7 @@
         });
         replacements.set(id, image);
       } catch (_) {
-        console.warn('Cannot load poster ' + id + ': ' + src + '; using bundled artwork');
+        console.warn('Cannot load poster ' + id + ': ' + src + '; leaving slot empty');
       }
     }));
   };
@@ -58,8 +38,9 @@
     c.height = h;
     return c;
   }
-  D.posters = function (atlas, config = {}) {
-    return D.slots.filter(({ id }) => !config || config[id] !== null).map(({ id, corners }) => {
+  D.posters = function (config = {}) {
+    const slots = D.slots.filter(({ id }) => config && config[id] !== null && replacements.has(id));
+    return slots.map(({ id, corners }) => {
       const [a, b, d] = corners;
       const c = [b[0] + d[0] - a[0], b[1] + d[1] - a[1]];
       const points = [a, b, c, d];
@@ -74,21 +55,22 @@
       points.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p));
       ctx.closePath();
       ctx.clip();
-      ctx.drawImage(atlas, 0, 0);
       const replacement = replacements.get(id);
-      if (replacement) {
-        // Derive each frame's aspect ratio before applying the wall shear.
-        // The narrow poster1 frame must not stretch a standard poster texture.
-        const height = 240 * (d[1] - a[1]) / (b[0] - a[0]);
-        ctx.transform((b[0] - a[0]) / 240, (b[1] - a[1]) / 240,
-          (d[0] - a[0]) / height, (d[1] - a[1]) / height, ...a);
-        // Keep the original frame. Crop the replacement centrally, without distortion.
-        const iw = 204, ih = height * 316 / 360;
-        const scale = Math.max(iw / replacement.width, ih / replacement.height);
-        const sw = iw / scale, sh = ih / scale;
-        ctx.drawImage(replacement, (replacement.width - sw) / 2, (replacement.height - sh) / 2,
-          sw, sh, 18, height * 22 / 360, iw, ih);
-      }
+      // Frames are generated only for successfully loaded user images.
+      const height = 240 * (d[1] - a[1]) / (b[0] - a[0]);
+      ctx.transform((b[0] - a[0]) / 240, (b[1] - a[1]) / 240,
+        (d[0] - a[0]) / height, (d[1] - a[1]) / height, ...a);
+      ctx.fillStyle = '#241812'; ctx.fillRect(0, 0, 240, height);
+      ctx.fillStyle = '#b98643'; ctx.fillRect(4, 4, 232, height - 8);
+      ctx.strokeStyle = '#f1cc79'; ctx.lineWidth = 2;
+      ctx.strokeRect(6, 6, 228, height - 12);
+      ctx.fillStyle = '#482919'; ctx.fillRect(12, 12, 216, height - 24);
+      // Crop centrally to fill the frame without distorting the image.
+      const iw = 204, ih = height * 316 / 360;
+      const scale = Math.max(iw / replacement.width, ih / replacement.height);
+      const sw = iw / scale, sh = ih / scale;
+      ctx.drawImage(replacement, (replacement.width - sw) / 2, (replacement.height - sh) / 2,
+        sw, sh, 18, height * 22 / 360, iw, ih);
       return { id, image, x: 12 + x * 936 / 1672, y: 6 + y * 527 / 941,
         w: w * 936 / 1672, h: h * 527 / 941 };
     });

@@ -4,9 +4,9 @@
   const VC = window.VC;
   const A = (VC.Art = { images: {}, ready: null, available: false });
   const sources = {
-    room: 'assets/art/cinema-room.png',
     alignedRoom: 'assets/art/cinema-room-aligned.png',
-    decorBackground: 'assets/art/cinema-decor-background.png',
+    rug1: 'assets/art/rug-1.png',
+    rug2: 'assets/art/rug-2.png',
     chair: 'assets/art/cinema-chair.png',
     viewers: 'assets/art/viewers.png',
     viewersExtra: 'assets/art/viewers-extra.png'
@@ -87,12 +87,33 @@
     c.height = h;
     return c;
   }
+  // Rectangular, top-down textures; each is projected onto its own floor rectangle.
+  let rugImages = [];
+  A.configureRugs = async function (config = {}) {
+    rugImages = await Promise.all(['rug1', 'rug2'].map(async id => {
+      const src = config && config[id];
+      if (src === null) return null;
+      const fallback = A.images[id];
+      if (typeof src !== 'string' || !src.trim() || src === sources[id]) return fallback;
+      const image = new Image();
+      try {
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = reject;
+          image.src = src;
+        });
+        return image;
+      } catch (_) {
+        console.warn('Cannot load rug ' + id + ': ' + src + '; using bundled artwork');
+        return fallback;
+      }
+    }));
+  };
   // The deterministic mesh is baked into this bundled layer. No pixel readback
   // or filesystem fetch is needed when OBS opens the overlay as a local file.
   A.room = function () {
     const room=canvas(1672,941);
     room.getContext('2d').drawImage(A.images.alignedRoom,0,0);
-    VC.Decor.cleanRoom(room.getContext('2d'), A.images.decorBackground);
     return room;
   };
   A.rugs = function (ctx) {
@@ -101,15 +122,17 @@
     // affine cells: the texture stays undistorted and all four edges stay on
     // their world lines.
     const N=8;
-    for(const rug of VC.Layout.RUGS) {
-      const [s0,s1,s2,s3]=rug.source;
-      const source=(u,v)=>[0,1].map(k=>(1-v)*((1-u)*s0[k]+u*s1[k])+v*((1-u)*s3[k]+u*s2[k]));
+    for(const [index,rug] of VC.Layout.RUGS.entries()) {
+      const image = index in rugImages ? rugImages[index] : A.images['rug' + (index + 1)];
+      if (!image) continue;
+      const source=(u,v)=>[u*image.naturalWidth,v*image.naturalHeight];
       const target=(u,v)=>VC.Layout.floorArt(rug.x0+(rug.x1-rug.x0)*u,rug.y0+(rug.y1-rug.y0)*v);
       for(let j=0;j<N;j++) for(let i=0;i<N;i++) {
         const cell=[[i,j],[i+1,j],[i+1,j+1],[i,j+1]].map(([u,v])=>[u/N,v/N]);
         const src=cell.map(c=>source(...c)), dst=cell.map(c=>target(...c));
+        // One artwork pixel of overlap keeps solid custom textures opaque at seams.
         for(const ids of [[0,1,2],[0,2,3]])
-          VC.RoomWarp.triangle(ctx,A.images.room,ids.map(k=>src[k]),ids.map(k=>dst[k]),.25);
+          VC.RoomWarp.triangle(ctx,image,ids.map(k=>src[k]),ids.map(k=>dst[k]),1);
       }
     }
     ctx.restore();
@@ -162,10 +185,10 @@
     front.restore();
     // Painted lamp positions in the displayed room art.
     const lights = [
-      [279, 412],
+      [279, 420],
       [431, 299],
       [615, 207],
-      [775, 115],
+      [737, 161], // clear of the cornice, in the gap between poster slots 4 and 5
       [197, 548],
       [396, 645],
       [517, 317]
@@ -180,7 +203,7 @@
       room,
       fg,
       lintel,
-      posters: VC.Decor.posters(A.images.alignedRoom, opts.posters),
+      posters: VC.Decor.posters(opts.posters),
       sign,
       seats: A.seats(),
       lights,

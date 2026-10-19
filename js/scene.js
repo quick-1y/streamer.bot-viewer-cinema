@@ -294,72 +294,6 @@
     ctx.fillRect(center.x - 4, center.y - 6, 1, 12);
     ctx.fillRect(center.x + 3, center.y - 6, 1, 12);
   }
-  function poster(ctx, a, kind) {
-    const z0 = 1.85,
-      z1 = 4.55,
-      b = a + 1.6;
-    poly(
-      ctx,
-      [
-        left(a - 0.14, z0 - 0.14),
-        left(b + 0.14, z0 - 0.14),
-        left(b + 0.14, z1 + 0.14),
-        left(a - 0.14, z1 + 0.14)
-      ],
-      '#291721',
-      '#110e18'
-    );
-    poly(
-      ctx,
-      [
-        left(a - 0.06, z0 - 0.06),
-        left(b + 0.06, z0 - 0.06),
-        left(b + 0.06, z1 + 0.06),
-        left(a - 0.06, z1 + 0.06)
-      ],
-      '#b87c3d',
-      '#e6aa57'
-    );
-    poly(
-      ctx,
-      [left(a, z0), left(b, z0), left(b, z1), left(a, z1)],
-      kind === 0 ? '#ba6550' : kind === 1 ? '#283950' : '#3c534a'
-    );
-    if (kind === 0) {
-      poly(
-        ctx,
-        [left(a, 2.35), left(a + 0.55, 3.8), left(a + 1, 3.02), left(b, 3.6), left(b, 2.35)],
-        '#4d354d'
-      );
-      poly(ctx, [left(a, 2.35), left(a + 0.9, 3.4), left(b, 2.35)], '#292b3c');
-      dot(ctx, 0.06, b - 0.3, 4.13, '#ffd280', 4);
-    } else {
-      const rnd = VC.rng(kind * 739);
-      for (let i = 0; i < 42; i++)
-        dot(
-          ctx,
-          0.06,
-          a + 0.12 + rnd() * 1.32,
-          2.4 + rnd() * 1.9,
-          i % 4 ? '#c28d53' : '#f4c480',
-          i % 7 ? 1 : 2
-        );
-      if (kind === 1)
-        poly(
-          ctx,
-          [left(a + 0.3, 2.4), left(a + 0.65, 3.8), left(a + 1.2, 3.6), left(a + 1.45, 2.4)],
-          '#a26944'
-        );
-    }
-    // Tiny typeset poster footer, following the wall perspective.
-    const p = P(0.08, b - 0.08, 2.12);
-    ctx.save();
-    ctx.transform(0.72, -0.36, 0, 1, p.x, p.y);
-    ctx.fillStyle = '#edc47d';
-    ctx.font = '7px "Pixelify Sans", monospace';
-    ctx.fillText(['MIDNIGHT', 'STARDUST', 'GOOD VIBES'][kind], 0, 0);
-    ctx.restore();
-  }
   function plant(ctx, x, y, size = 1) {
     box(ctx, x - 0.23, y - 0.23, 0.46, 0.46, 0, 0.48, '#aa6740', '#79422d', '#4c2c27');
     line(ctx, [x - 0.23, y + 0.23, 0.39], [x + 0.23, y + 0.23, 0.39], '#c18c51');
@@ -800,9 +734,6 @@
     line(ctx, [0, 0, L.H], [L.W, 0, L.H], '#bf8443');
     line(ctx, [0, 0, L.H], [0, L.D, L.H], '#bf8443');
     screen(ctx);
-    poster(ctx, 2.1, 0);
-    poster(ctx, 6.1, 1);
-    poster(ctx, 9.35, 2);
     const lights = [];
     for (const y of [1.05, 4.35, 8.3, 13.55]) {
       lantern(ctx, left, y, 3.15);
