@@ -190,7 +190,7 @@
       [615, 207],
       [737, 161], // clear of the cornice, in the gap between poster slots 4 and 5
       [197, 548],
-      [396, 645],
+      [390, 647],
       [517, 317]
     ].map(([x, y]) => ({
       ...F(x, y),

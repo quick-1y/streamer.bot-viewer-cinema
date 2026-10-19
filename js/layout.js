@@ -52,11 +52,14 @@
 
   // Four surveyed floor corners, (0,0), (W,0), (W,D), (0,D), in room-art pixels.
   // Each is the intersection of two painted edges: the screen-wall base (29.6°),
-  // the front floor edge (29.4°), the right floor edge and the left wall base.
+  // the front floor edge (29.4°) and the right floor edge (−27.5°). The x = 0
+  // side runs through the back corner parallel to the right edge, which is the
+  // direction of the painted floorboards (−27.3°…−27.9°), so rug ends and aisles
+  // follow the boards and the floor is a near-parallelogram, not a trapezoid.
   // A projective map keeps the y = 0 and y = D rows exactly on those painted
   // walls, so chair rows, rugs and the fence run parallel to the screen and
   // the entrance even though the artwork is not a perfect parallel projection.
-  L.FLOOR = { corners: [[884, 291], [1477.1, 628], [907.7, 923.8], [293.7, 577.3]] };
+  L.FLOOR = { corners: [[884, 291], [1477.1, 628], [907.7, 923.8], [312.5, 587.9]] };
   (function () {
     // Unit square → quad (Heckbert). H maps (u, v, 1) to homogeneous art pixels.
     const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = L.FLOOR.corners;
@@ -109,26 +112,37 @@
       [357, 713],
       [240, 648]
     ],
+    // One straight entrance wall in the plane of the door posts (floor y ≈ 20.6),
+    // capped at the height of the post blocks and closed by an end post.
     facade: [
-      [157, 466],
+      [157, 460],
+      [174, 451],
       [210, 441],
       [398, 534],
-      [398, 597],
-      [452, 628],
-      [452, 766],
-      [440, 773],
+      [398, 578],
+      [459, 612],
+      [461, 604],
+      [473, 611],
+      [473, 772],
+      [452, 783],
+      [440, 776],
+      [373, 738],
       [357, 722],
       [240, 652],
-      [228, 660],
-      [155, 636]
+      [226, 653],
+      [157, 614]
     ],
     lintel: [
       [210, 441],
       [398, 534],
-      [398, 597],
-      [452, 628],
-      [452, 645],
-      [398, 614],
+      [398, 578],
+      [459, 612],
+      [461, 604],
+      [473, 611],
+      [473, 632],
+      [452, 643],
+      [443, 634],
+      [395, 607],
       [357, 588],
       [237, 530],
       [210, 514]
