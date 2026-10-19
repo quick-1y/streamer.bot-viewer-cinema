@@ -578,10 +578,13 @@ def main():
         masks = pg.evaluate("""() => {
             const scene=__cinema.renderer.scene, fg=scene.fg.getContext('2d'), header=scene.lintel.getContext('2d');
             const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(x,y);return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
-            return {opening:alpha(fg,298,620),wall:alpha(fg,440,690),header:alpha(header,300,500)};
+            return {opening:alpha(fg,298,620),wall:alpha(fg,440,690),header:alpha(header,300,500),
+                corner:alpha(fg,450,605),cornerHeader:alpha(header,450,605)};
         }""")
         check('16. doorway stays open while facade and lintel occlude the actor',
               masks['opening']==0 and masks['wall']>240 and masks['header']>240, json.dumps(masks))
+        check('16a. raised wall-return cap also occludes passing viewers',
+              masks['corner']>240 and masks['cornerHeader']>240, json.dumps(masks))
         rails = pg.evaluate("""() => {
             const caps=[];const ctx={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},fillRect(x,y){caps.push([x,y]);}};
             VC.Art.railings(ctx);
