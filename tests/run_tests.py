@@ -509,10 +509,27 @@ def main():
                 const sx=(p.sx-12)*1672/936-a[0],sy=(p.sy-6)*941/527-a[1];
                 return ((b[0]-a[0])*sy-(b[1]-a[1])*sx)/length;
             });
-            return {rugs,rails,gap:Math.min(...gaps)};
+            // Conservative support rectangles for the two painted feet in the
+            // cached 100x100 chair texture, rather than just the seat anchors.
+            const footCorners=[[18,65],[34,65],[34,75],[18,75],
+                [60,82],[75,82],[75,92],[60,92]];
+            const sprite=__cinema.renderer.scene.seats;
+            const feet=L.buildSeats(60).every(seat=>{
+                const rug=L.RUGS[seat.row<3?0:1],p=L.project(seat.x,seat.y);
+                const sx=Math.round(p.x*L.ART_SCALE)/L.ART_SCALE;
+                const sy=Math.round(p.y*L.ART_SCALE)/L.ART_SCALE;
+                return footCorners.every(([u,v])=>{
+                    const x=sx-sprite.ax+u*sprite.w/100;
+                    const y=sy-sprite.ay+v*sprite.h/100;
+                    const point=L.fromArt((x-12)*1672/936,(y-6)*941/527);
+                    return point.x>=rug.x0&&point.x<=rug.x1&&point.y>=rug.y0&&point.y<=rug.y1;
+                });
+            });
+            return {rugs,rails,feet,gap:Math.min(...gaps)};
         }""")
         check('15b. rugs sit on exact floor rectangles and both fence runs follow the painted floor edges',
               plane['rugs'] and plane['rails'],json.dumps(plane))
+        check('15b2. all 60 chairs have both painted feet fully inside their rug', plane['feet'])
         check('15c. first chair row has at least 110 source pixels of perpendicular screen-wall clearance',
               plane['gap']>=110,json.dumps(plane))
         wall_pixels = pg.evaluate("""async () => {

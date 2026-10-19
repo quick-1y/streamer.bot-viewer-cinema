@@ -93,8 +93,9 @@
     return { x: (a * x + b * y + c) / w * L.W, y: (d * x + e * y + f) / w * L.D };
   };
   L.RUGS = [
-    { x0: 1.6, x1: 18.3, y0: 3.2, y1: 8.6 },
-    { x0: 1.6, x1: 18.3, y0: 9.7, y1: 15.5 }
+    // Cover the painted chair feet, which extend left/forward of each seat anchor.
+    { x0: 0.55, x1: 17.9, y0: 2.8, y1: 8.6 },
+    { x0: 0.55, x1: 17.9, y0: 9.4, y1: 15.5 }
   ];
   L.rugCorners = (r) => [[r.x0,r.y0],[r.x1,r.y0],[r.x1,r.y1],[r.x0,r.y1]]
     .map(([x,y]) => L.floorArt(x,y));
@@ -154,7 +155,7 @@
     (L.artContains(L.ART_GEOMETRY.facade, point) && !L.artContains(L.ART_GEOMETRY.opening, point));
 
   // Seats share the same plane as the rugs and railings. The first row is
-  // 4.1 tiles from the screen wall; the carpet starts 3.2 tiles from it.
+  // 4.1 tiles from the screen wall; the carpet starts 2.8 tiles from it.
   L.seatPoint = function (row, nominalX, forward = 0) {
     return { x: nominalX, y: L.ROWS[row] - forward };
   };
