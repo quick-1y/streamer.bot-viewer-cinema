@@ -17,18 +17,28 @@
     return [[-padding, -padding], [1 + padding, -padding],
       [1 + padding, 1 + padding], [-padding, 1 + padding]].map(p => at(...p));
   }
+  // Room-space bounds and horizontal offsets in decor-clean-atlas.png.
+  const cleanPatches = [
+    {x:233,y:329,w:47,h:134,sx:0},
+    {x:286,y:328,w:37,h:74,sx:47},
+    {x:323,y:267,w:83,h:144,sx:84},
+    {x:647,y:120,w:82,h:155,sx:167},
+    {x:745,y:124,w:75,h:129,sx:249},
+    {x:241,y:484,w:110,h:96,sx:324}
+  ];
   D.cleanRoom = function (ctx, clean) {
     const patches = D.slots.map(s => quad(s.corners, .035));
     patches.push(quad([[243, 486], [349, 546], [243, 518]]));
     // Replace only decoration footprints; preserve the hand-calibrated room,
     // floor, walls, door, lamps and silhouette pixel for pixel everywhere else.
-    for (const points of patches) {
+    for (const [index, points] of patches.entries()) {
+      const {x,y,w,h,sx} = cleanPatches[index];
       ctx.save();
       ctx.beginPath();
       points.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p));
       ctx.closePath();
       ctx.clip();
-      ctx.drawImage(clean, 0, 0);
+      ctx.drawImage(clean, sx, 0, w, h, x, y, w, h);
       ctx.restore();
     }
   };

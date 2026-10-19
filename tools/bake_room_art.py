@@ -4,7 +4,8 @@
 Authoring only: install NumPy, Pillow and SciPy, then run from the repository:
 
     python3 tools/build_room_mesh.py
-    python3 tools/bake_room_art.py
+    python3 tools/bake_room_art.py --room /path/to/original-room.png \
+        --floor /path/to/original-floor.png --output /tmp/rebuilt-room.png
 
 The browser loads the resulting PNG directly and needs no image readback or
 Python packages. The original room/floor PNGs stay unchanged. This script uses
@@ -22,7 +23,6 @@ from PIL import Image, ImageDraw
 
 from build_room_mesh import build
 
-ROOT = Path(__file__).resolve().parents[1]
 # Original painted rug footprints, matching Layout.RUGS[*].source. New rugs are
 # composited separately by the browser in the exact floor coordinate plane.
 OLD_RUGS = (
@@ -165,9 +165,11 @@ def render(source, mesh):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--room', type=Path, default=ROOT / 'assets/art/cinema-room.png')
-    parser.add_argument('--floor', type=Path, default=ROOT / 'assets/art/cinema-floor.png')
-    parser.add_argument('--output', type=Path, default=ROOT / 'assets/art/cinema-room-aligned.png')
+    # Legacy source paintings are no longer runtime assets or bundled duplicates.
+    # Require explicit inputs/output so this cannot overwrite the hand-edited room.
+    parser.add_argument('--room', type=Path, required=True)
+    parser.add_argument('--floor', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     mesh, report = build()
     source = source_room(args.room, args.floor, mesh['sourceHeight'])

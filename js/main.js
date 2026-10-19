@@ -47,6 +47,7 @@
       await document.fonts.load('700 48px "Pixelify Sans"').catch(() => {});
     }
     await VC.Decor.ready(cfg.posters);
+    await VC.Art.configureRugs(cfg.rugs);
     VC.log.enabled = !!cfg.debug;
     applyBackground(cfg.background);
 

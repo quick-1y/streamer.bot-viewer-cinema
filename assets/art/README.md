@@ -2,32 +2,21 @@
 
 Bundled, generated illustrations used by the overlay; no remote image requests at runtime.
 
-- `cinema-room-aligned.png`: displayed room. It started as the mathematically rectified bake of the original illustration and was then corrected by hand; it is now the source of truth for all calibration. Its old rugs have been removed; the two rug textures are sampled separately onto exact floor rectangles. This is a bundled PNG so OBS local-file startup requires no pixel readback or authoring dependencies.
-- `cinema-room.png`: original illustration, still loaded at runtime as the source of the two rug textures in `Art.rugs()`. It is also the input to the optional room-baking tool and the negative example in the wall-pixel regression test. It is not the displayed room background; do not delete it as an obsolete duplicate.
-- `cinema-decor-background.png`: clean red wall and blank marquee artwork. At runtime only the five poster footprints and the inside of the marquee are sampled from this file. Everything outside those masks remains the hand-corrected `cinema-room-aligned.png` pixel for pixel. The five posters themselves are sampled from that unchanged aligned image into separate cached objects; custom replacements and hiding are configured through `CINEMA_CONFIG.posters`.
-- `../posters/poster1.svg` … `../posters/poster5.svg`: numbered local placeholders, ordered left to right and enabled in `config.js`. Replace these files or point the corresponding `poster1` … `poster5` setting to a local PNG/JPG/SVG. Omitting a setting restores the bundled illustration; `null` hides that poster and its frame.
-- `cinema-floor.png`: authoring-only input to `tools/bake_room_art.py` for wooden floor restoration, clipped to the old carpet footprints. The browser does not load this file. Keep it to preserve the documented baking workflow.
+- `cinema-room-aligned.png`: the **only room background**. This hand-edited illustration is the source of truth for calibration. Rugs, chairs, viewers, replacement posters and marquee text are rendered separately.
+- `rug-1.png`, `rug-2.png`: independent 1024×384 top-down rug textures, ordered from the screen toward the entrance. Configure each image through `CINEMA_CONFIG.rugs`; use `null` to hide it. Perspective is applied by the renderer, so custom images should be ordinary rectangles rather than perspective drawings. A missing setting or an image-load error uses the bundled texture. Local files work in OBS without pixel readback.
+- `decor-clean-atlas.png`: compact 434×155 utility atlas containing only the five clean wall patches and blank marquee interior. `js/decor.js` clips these patches into the room when replacing/hiding posters or drawing custom text. It is not another room background. Keep its pixel dimensions and patch offsets in sync with `cleanPatches` in that file.
+- `../posters/poster1.svg` … `../posters/poster5.svg`: numbered placeholders. The deployment config currently selects `poster1-alliance.svg` for the first slot. Set `CINEMA_CONFIG.posters` to replace individual posters, use `null` to hide one, or omit a setting to use the original poster sampled from the room.
 - `cinema-chair.png`: transparent velvet chair, sampled into a cached seat layer with a floor contact shadow.
 - `viewers.png`, `viewers-extra.png`: two transparent sheets, each with four character rows and three pose columns (front, walking back, seated).
 
 `js/art.js` contains the source crop rectangles, native canvas caches, facade occlusion mask, lighting positions and stable wardrobe variants. The composition renders in 1920×1080. Movement uses logical coordinates from `js/layout.js`; its `FLOOR` corners (four reference points), `RUGS` rectangles, `ART_GEOMETRY` anchors, door threshold, fence endpoints and `seatPoint` row calibration follow this room artwork. When replacing an image, update that calibration and inspect both seated and walking viewers, including the entrance and a full hall.
 
-All seven PNGs in this directory have a runtime or authoring consumer. For visual room edits, change `cinema-room-aligned.png`; the other room-sized images serve the specific purposes above. The documentation preview is `/preview.png` at the repository root.
+All PNGs in this directory are runtime assets. For visual room edits, change only `cinema-room-aligned.png`. The documentation preview is `/preview.png` at the repository root.
 
 Floor calibration in room-art pixels is a projective map of the world rectangle `0..19.8 × 0..17.4` onto four corners: `(884,291)`, `(1477.1,628)`, `(907.7,923.8)`, `(293.7,577.3)` for `(0,0)`, `(W,0)`, `(W,D)`, `(0,D)`. Each corner is the intersection of two edges fitted to the painted pixels: the screen-wall base where the stage strip meets the parquet (29.6°), the inner front floor edge (29.4°), the inner right floor edge (−27.5°) and the left wall base. Rows of constant world y therefore run parallel to both the screen wall and the entrance wall, even though the artwork is not a perfect parallel projection. Fence runs keep one world coordinate constant; rugs are world rectangles sampled as an 8×8 grid of affine cells; all six seat rows use constant world y. The entrance anchors, occlusion polygons and lamp positions in `js/layout.js` and `js/art.js` are surveyed directly in this image.
 
-The original illustration contained incompatible angles (screen top about 29°, screen bottom 31°, entrance beam sections 31–33.4°). `tools/build_room_mesh.py` surveys these visible edges and builds a constrained piecewise-affine correction to common axes; `tools/bake_room_art.py` restores the old rug footprints and bakes it. The current file was hand-corrected after that bake.
+The old full-room rug source, full-room clean-decoration source and authoring-only floor painting have been removed. Their previous versions remain in Git history; runtime rendering no longer needs them. `tests/fixtures/wall-angle-negative.png` contains only four narrow legacy edge strips for the pixel detector's negative control, not another room illustration.
 
-The hand-corrected room art still contains small inconsistencies of its own (for example the screen's upper edge is about 28° while its lower edge is 29.6°); the floor is calibrated against the floor-level edges, which is what chairs, rugs and walkers touch.
-
-The scripts below rebuild the *original automatic* correction. `tools/bake_room_art.py` overwrites `cinema-room-aligned.png` and would discard the manual corrections; if you rerun it, resurvey the floor corners, entrance polygons and lamps afterwards. They need Python, NumPy, SciPy and Pillow (not runtime requirements):
-
-```sh
-python tools/build_room_mesh.py
-python tools/bake_room_art.py
-python tests/room_mesh.py
-```
-
-After rebaking, run the browser suite as well: it measures the actual corrected wall pixels, checks the original artwork as a negative example, and exercises the transformed door in both directions.
+`tools/build_room_mesh.py` and `tests/room_mesh.py` retain the historical correction geometry. The legacy `tools/bake_room_art.py` now requires explicit `--room`, `--floor` and `--output` paths to externally supplied source paintings. It cannot overwrite the current room through a default output path. Rebuilding that old automatic correction discards later manual edits; use it only for deliberate authoring work, then resurvey calibration and run the browser suite. Normal development and custom rugs do not require any bake or Python image packages.
 
 Marquee lettering is generated by `js/decor.js` from `signText` (or `?sign=`), after loading the bundled font. Measured glyph bounds fit a fixed canvas projected onto the marquee. The decorated room is shared by the background, foreground facade and lintel masks so none can paint the old lettering over custom text. Poster masks and sign anchors are surveyed in the aligned artwork, independently of the original authoring image.

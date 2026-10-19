@@ -118,11 +118,11 @@ def main():
             const scene = __cinema.renderer.scene;
             return {ids: scene.posters.map(p => p.id),
                 distinct: new Set(scene.posters.map(p => p.image)).size,
-                sign: scene.sign.text};
+                sign: scene.sign.text, configuredSign: window.CINEMA_CONFIG.signText ?? 'CINEMA'};
         }''')
         check('decor. five posters are separate cached objects', decor['ids'] ==
               ['poster1', 'poster2', 'poster3', 'poster4', 'poster5'] and decor['distinct'] == 5)
-        check('decor. default marquee text is CINEMA', decor['sign'] == 'CINEMA')
+        check('decor. marquee uses configured text', decor['sign'] == decor['configuredSign'])
         custom = pg.evaluate('''async () => {
             // Compare against bundled art independently of configured placeholders.
             await VC.Decor.ready({});
@@ -168,6 +168,64 @@ def main():
             check('decor. ' + label + ' marquee fits its panel', fitted['text'] == expected and
                   fitted['width'] <= 592.001 and fitted['height'] <= 128.001 and
                   fitted['visible'] == bool(expected))
+        pg.close()
+
+        # ---------------------------------------------------------------- independent rug textures
+        pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
+        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.wait_for_function('window.__cinema !== undefined')
+        rugs = pg.evaluate('''async () => {
+            const render = () => {
+                const c = document.createElement('canvas'); c.width=1920; c.height=1080;
+                VC.Art.rugs(c.getContext('2d')); return c;
+            };
+            const sample = (c,index) => {
+                const r=VC.Layout.RUGS[index],p=VC.Layout.floorArt((r.x0+r.x1)/2,(r.y0+r.y1)/2);
+                return Array.from(c.getContext('2d').getImageData(
+                    Math.round(24+p[0]*1872/1672),Math.round(12+p[1]*1054/941),1,1).data);
+            };
+            await VC.Art.configureRugs({});
+            const baseline=render(), replacement=document.createElement('canvas');
+            replacement.width=32;replacement.height=16;
+            const ctx=replacement.getContext('2d');ctx.fillStyle='#00ff00';ctx.fillRect(0,0,32,16);
+            const custom=replacement.toDataURL();
+            await VC.Art.configureRugs({rug1:custom});
+            const changed=render();
+            const independent=JSON.stringify(sample(changed,1))===JSON.stringify(sample(baseline,1));
+            const green=sample(changed,0);
+            await VC.Art.configureRugs({rug1:custom,rug2:null});
+            const hidden=render();
+            await VC.Art.configureRugs({rug1:'data:image/png;base64,bm90LWFuLWltYWdl'});
+            const fallback=render().toDataURL()===baseline.toDataURL();
+            await VC.Art.configureRugs({rug1:null,rug2:null});
+            const empty=render(), pixels=empty.getContext('2d').getImageData(0,0,1920,1080).data;
+            return {independent,green,custom,hidden:sample(hidden,1)[3]===0,
+                fallback,empty:!pixels.some((v,i)=>i%4===3&&v>0)};
+        }''')
+        check('rugs. custom rectangular image replaces only the selected rug',
+              rugs['independent'] and rugs['green'] == [0, 255, 0, 255])
+        check('rugs. null hides individual rugs or both rugs', rugs['hidden'] and rugs['empty'])
+        check('rugs. invalid custom image falls back to bundled texture', rugs['fallback'])
+        pg.close()
+
+        pg = browser.new_page()
+        custom_config = (ROOT / 'config.js').read_text() + '\nCINEMA_CONFIG.rugs = ' + json.dumps(
+            {'rug1': rugs['custom'], 'rug2': None}) + ';'
+        pg.route('**/config.js', lambda route: route.fulfill(
+            body=custom_config, content_type='text/javascript'))
+        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.wait_for_function('window.__cinema !== undefined')
+        configured = pg.evaluate('''() => {
+            const c=document.createElement('canvas');c.width=1920;c.height=1080;
+            const ctx=c.getContext('2d');VC.Art.rugs(ctx);
+            return VC.Layout.RUGS.map(r=>{
+                const p=VC.Layout.floorArt((r.x0+r.x1)/2,(r.y0+r.y1)/2);
+                return Array.from(ctx.getImageData(Math.round(24+p[0]*1872/1672),
+                    Math.round(12+p[1]*1054/941),1,1).data);
+            });
+        }''')
+        check('rugs. startup applies custom image and hidden rug from config.js',
+              configured[0] == [0, 255, 0, 255] and configured[1][3] == 0)
         pg.close()
 
         # ---------------------------------------------------------------- 1. empty list
@@ -457,11 +515,15 @@ def main():
               plane['rugs'] and plane['rails'],json.dumps(plane))
         check('15c. first chair row has at least 110 source pixels of perpendicular screen-wall clearance',
               plane['gap']>=110,json.dumps(plane))
-        wall_pixels = pg.evaluate("""() => {
+        wall_pixels = pg.evaluate("""async () => {
             const measure = """ + (ROOT / 'tests' / 'wall_pixels.js').read_text() + """;
             const original=document.createElement('canvas');
             original.width=1672;original.height=941;
-            original.getContext('2d').drawImage(VC.Art.images.room,0,0);
+            // Only the four edge strips are needed for the negative control.
+            const fixture = new Image();
+            fixture.src = 'tests/fixtures/wall-angle-negative.png';
+            await fixture.decode();
+            original.getContext('2d').drawImage(fixture,0,0);
             // Search bands around the painted screen-wall base (stage strip → parquet)
             // and the front floor edge; the angles come from the rendered pixels.
             const guides=[{name:'screen-wall-base',target:[[960,350.9],[1380,589.1]]},
