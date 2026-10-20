@@ -579,14 +579,14 @@ def main():
             const scene=__cinema.renderer.scene, fg=scene.fg.getContext('2d'), header=scene.lintel.getContext('2d');
             const alpha=(ctx,x,y)=>{const p=VC.Layout.artPoint(x,y);return ctx.getImageData(Math.round(p.x*2),Math.round(p.y*2),1,1).data[3];};
             return {opening:alpha(fg,298,620),wall:alpha(fg,440,690),header:alpha(header,300,500),
-                corner:alpha(fg,430,626),cornerHeader:alpha(header,430,626),
-                formerCorner:alpha(fg,430,600),beyondWall:alpha(fg,490,700)};
+                cap:alpha(fg,420,608),capHeader:alpha(header,420,608),rightWall:alpha(fg,420,690),
+                beyondPost:alpha(fg,500,700),beyondPostHeader:alpha(header,500,700)};
         }""")
         check('16. doorway stays open while facade and lintel occlude the actor',
               masks['opening']==0 and masks['wall']>240 and masks['header']>240, json.dumps(masks))
-        check('16a. straight right cap occludes viewers without a raised corner',
-              masks['corner']>240 and masks['cornerHeader']>240 and masks['formerCorner']==0 and
-              masks['beyondWall']==0, json.dumps(masks))
+        check('16a. straight right wall: cap and wall occlude up to the end post, the floor beyond it is open',
+              masks['cap']>240 and masks['capHeader']>240 and masks['rightWall']>240 and
+              masks['beyondPost']==0 and masks['beyondPostHeader']==0, json.dumps(masks))
         rails = pg.evaluate("""() => {
             const caps=[];const ctx={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},fillRect(x,y){caps.push([x,y]);}};
             VC.Art.railings(ctx);
