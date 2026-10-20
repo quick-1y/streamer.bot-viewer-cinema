@@ -1,0 +1,154 @@
+/* Screen content shared by starting.html, break.html and ending.html. */
+(function () {
+  'use strict';
+  const VC = window.VC, W = 1000, H = 400;
+  const str = (v, d) => typeof v === 'string' ? v : d;
+  const number = (v, d, min, max) => v !== undefined && v !== null && Number.isFinite(+v) ? VC.clamp(+v, min, max) : d;
+  function namesAt(data, path) {
+    if (!Array.isArray(path) || !path.length) return [];
+    for (const key of path) {
+      if (!data || !Object.prototype.hasOwnProperty.call(data, key)) return [];
+      data = data[key];
+    }
+    if (!Array.isArray(data)) return [];
+    const seen = new Set();
+    return data.map(v => typeof v === 'string' ? v : v && (v.display || v.displayName || v.userName || v.name || v.login))
+      .filter(v => {
+        if (typeof v !== 'string' || !v.trim() || seen.has(v.trim().toLowerCase())) return false;
+        seen.add(v.trim().toLowerCase()); return true;
+      });
+  }
+  class ScreenScene {
+    constructor(renderer, cfg) {
+      this.renderer = renderer; this.cfg = cfg; this.mode = document.body.dataset.scene;
+      this.q = new URLSearchParams(location.search);
+      this.elapsed = 0; this.phase = 'intro'; this.loaded = false; this.loading = false; this.groups = [];
+      this.el = document.createElement('section'); this.el.className = 'cinema-screen';
+      this.el.setAttribute('aria-label', 'Экран кинотеатра'); renderer.root.appendChild(this.el);
+      if (this.mode === 'starting') this.message(this.q.get('text') ?? str(cfg.startingText, 'Стрим скоро начнется'));
+      if (this.mode === 'break') this.buildChat();
+      if (this.mode === 'ending') {
+        this.el.classList.add('is-credits');
+        this.message(this.q.get('text') ?? str(cfg.endingText, 'Стрим завершен'));
+        if (cfg.demo) this.acceptCredits({ users: { users: ['Котейка', 'Aurora', 'NightRain'] },
+          events: { follows: ['Новый_зритель'], subs: ['Sakura'], cheers: ['Pixel'] }, groups: { donors: ['СпасибоЗаПоддержку'] } });
+      }
+      this.position();
+    }
+    position() {
+      const r = this.renderer, p = VC.Layout.artPoint(964, 128);
+      const x = 416 * 936 / 1672 / W * r.scale;
+      const y = 416 * (344 / 639) * 527 / 941 / W * r.scale;
+      const h = 160 * 527 / 941 / H * r.scale;
+      this.el.style.transform = `matrix(${x},${y},0,${h},${r.offX + p.x * r.scale},${r.offY + p.y * r.scale})`;
+    }
+    message(value) {
+      this.el.replaceChildren();
+      const box = document.createElement('div'); box.className = 'screen-message';
+      const span = document.createElement('span'); span.textContent = value;
+      box.appendChild(span); this.el.appendChild(box);
+      let lo = 1, hi = 86;
+      while (hi - lo > .25) {
+        const size = (lo + hi) / 2; span.style.fontSize = size + 'px';
+        if (span.scrollHeight <= box.clientHeight && span.scrollWidth <= box.clientWidth) lo = size;
+        else hi = size;
+      }
+      span.style.fontSize = lo + 'px';
+    }
+    buildChat() {
+      const url = this.q.get('chatUrl') ?? this.cfg.chatUrl;
+      this.chatMode = url ? 'embed' : (this.q.get('chatMode') || this.cfg.chatMode || 'streamerbot');
+      const box = document.createElement('div'); box.className = 'screen-chat'; this.el.appendChild(box);
+      if (this.chatMode === 'embed') {
+        try {
+          const parsed = new URL(url);
+          if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('Unsupported chat URL');
+          const iframe = document.createElement('iframe'); iframe.title = 'Чат стрима'; iframe.src = parsed.href;
+          iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+          iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+          box.style.padding = '0'; box.appendChild(iframe);
+        } catch (_) { this.message('Укажите ссылку на виджет чата в chatUrl'); }
+        return;
+      }
+      const heading = document.createElement('h1'); heading.textContent = str(this.cfg.breakText, 'Перерыв. Скоро вернусь!'); box.appendChild(heading);
+      this.chat = document.createElement('div'); this.chat.className = 'chat-messages'; box.appendChild(this.chat);
+      this.chatNotice('Подключаемся к чату…');
+      if (this.cfg.demo) { this.addChat('Котейка', 'Всем привет!'); this.addChat('Aurora', 'Ждём продолжения 🍿'); }
+    }
+    chatNotice(value) {
+      if (this.chat && !this.chat.querySelector('.chat-line')) {
+        this.chat.replaceChildren(); const el = document.createElement('div'); el.className = 'chat-empty'; el.textContent = value; this.chat.appendChild(el);
+      }
+    }
+    addChat(name, value) {
+      if (!this.chat || typeof value !== 'string' || !value.trim()) return;
+      const notice = this.chat.querySelector('.chat-empty'); if (notice) notice.remove();
+      const line = document.createElement('div'); line.className = 'chat-line';
+      const author = document.createElement('strong'); author.textContent = str(name, 'Зритель') + ': ';
+      line.append(author, document.createTextNode(value)); this.chat.appendChild(line);
+      const contentHeight = () => Array.from(this.chat.children).reduce((sum, el) => sum + el.offsetHeight, 0) + (this.chat.children.length - 1) * 9;
+      while (this.chat.children.length > 1 && (this.chat.children.length > 20 || contentHeight() > this.chat.clientHeight)) this.chat.firstChild.remove();
+    }
+    connect(connection) {
+      if (this.mode === 'break' && this.chatMode === 'streamerbot') {
+        connection.subscriptions.Twitch.push('ChatMessage', 'ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut');
+        connection.on('ready', () => this.chatNotice('Чат подключён. Ждём сообщений…'));
+        connection.on('state', s => { if (s === 'waiting') this.chatNotice('Соединение потеряно. Переподключаемся…'); });
+        connection.on('event', event => {
+          if (event.source !== 'Twitch') return;
+          if (event.type === 'ChatMessage') {
+            const m = event.data.message; if (m) this.addChat(m.displayName || m.username, m.message);
+          } else if (['ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut'].includes(event.type)) {
+            this.chat.replaceChildren(); this.chatNotice('Чат подключён. Ждём сообщений…');
+          }
+        });
+      }
+      if (this.mode === 'ending') connection.on('ready', () => this.fetchCredits(connection));
+    }
+    async fetchCredits(connection) {
+      if (this.loaded || this.loading) return;
+      this.loading = true;
+      try {
+        const res = await connection.request({ request: 'GetCredits' });
+        if (!res || res.status !== 'ok') throw new Error(res && res.error || 'GetCredits failed');
+        const data = res.credits || res;
+        if (!data.users || typeof data.users !== 'object' || Array.isArray(data.users)) throw new Error('Invalid Credits payload');
+        this.acceptCredits(data);
+      } catch (e) {
+        VC.log.warn('Credits:', e.message); this.phase = 'error';
+        this.message('Стрим завершен\nНе удалось загрузить титры.\nПроверьте Credits и подключение Streamer.bot.');
+      } finally { this.loading = false; }
+    }
+    acceptCredits(data) {
+      this.groups = (Array.isArray(this.cfg.creditsGroups) ? this.cfg.creditsGroups : []).map(g => ({ title: str(g.title, ''), names: namesAt(data, g.path) })).filter(g => g.names.length);
+      this.loaded = true; this.phase = 'intro'; this.elapsed = 0;
+      this.message(this.q.get('text') ?? str(this.cfg.endingText, 'Стрим завершен'));
+    }
+    startRoll() {
+      this.el.replaceChildren(); this.roll = document.createElement('div'); this.roll.className = 'credits-roll';
+      for (const group of this.groups) {
+        const section = document.createElement('div'); section.className = 'credits-group';
+        const heading = document.createElement('h2'); heading.textContent = group.title; section.appendChild(heading);
+        for (const name of group.names) {
+          const line = document.createElement('div'); line.className = 'credits-name'; line.textContent = name; section.appendChild(line);
+        }
+        this.roll.appendChild(section);
+      }
+      this.el.appendChild(this.roll); this.offset = H; this.phase = 'roll'; this.roll.style.transform = `translateY(${this.offset}px)`;
+    }
+    update(dt) {
+      this.position();
+      if (this.mode !== 'ending' || !this.loaded) return;
+      this.elapsed += dt;
+      if (this.phase === 'intro' && this.elapsed >= number(this.q.get('creditsIntro') ?? this.cfg.creditsIntroSeconds, 4, 0, 120)) {
+        if (this.groups.length) this.startRoll(); else this.finish();
+      } else if (this.phase === 'roll') {
+        this.offset -= number(this.q.get('creditsSpeed') ?? this.cfg.creditsSpeed, 45, 5, 300) * dt;
+        this.roll.style.transform = `translateY(${this.offset}px)`;
+        if (this.offset < -this.roll.offsetHeight) this.finish();
+      }
+    }
+    finish() { this.phase = 'thanks'; this.message(this.q.get('thanks') ?? str(this.cfg.thanksText, 'Спасибо, что были с нами!')); }
+  }
+  VC.ScreenScene = ScreenScene;
+})();

@@ -88,3 +88,25 @@ html, body {
   35% { transform: scale(1.22); color: #ffd36b; }
   100% { transform: scale(1); }
 }
+
+/* Screen plane calibrated to the painted interior, clipped before projection. */
+.cinema-screen {
+  position: absolute; left: 0; top: 0; width: 1000px; height: 400px;
+  transform-origin: 0 0; overflow: hidden; contain: layout paint;
+  color: #38251f; background: #e6dacb;
+  font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif; pointer-events: none;
+}
+.screen-message { position: absolute; inset: 28px 40px; display: flex; align-items: center; justify-content: center; text-align: center; }
+.screen-message span { display: block; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.15; font-weight: 600; min-width: 0; max-width: 100%; }
+.screen-chat { box-sizing: border-box; height: 100%; padding: 18px 28px; }
+.screen-chat h1 { margin: 0 0 12px; font-size: 38px; overflow-wrap: anywhere; }
+.chat-messages { height: 310px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 9px; }
+.chat-line { flex: 0 0 auto; font-size: 29px; line-height: 1.15; overflow-wrap: anywhere; white-space: pre-wrap; }
+.chat-line strong { color: #8f332b; }
+.chat-empty { font-size: 30px; opacity: .7; }
+.screen-chat iframe { width: 100%; height: 100%; border: 0; background: transparent; }
+.cinema-screen.is-credits { background: #191519; color: #fff1d5; }
+.credits-roll { position: absolute; left: 45px; right: 45px; top: 0; text-align: center; will-change: transform; }
+.credits-group { margin-bottom: 65px; }
+.credits-group h2 { font-size: 44px; font-weight: 600; color: #ffd184; margin: 0 0 20px; overflow-wrap: anywhere; }
+.credits-name { font-size: 36px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }

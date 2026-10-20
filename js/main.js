@@ -60,6 +60,7 @@
       counterLabel: cfg.counterLabel || 'Зрители'
     });
     renderer.setSeats(seats);
+    const screenScene = VC.ScreenScene ? new VC.ScreenScene(renderer, cfg) : null;
     const session = new VC.AudienceSession(cfg, audience);
     session.restore();
 
@@ -86,6 +87,7 @@
         hideBroadcaster: cfg.hideBroadcaster
       }, onList);
       sync.start();
+      if (screenScene) screenScene.connect(connection);
       connection.start();
     }
 
@@ -96,6 +98,7 @@
       last = now;
       audience.update(dt);
       renderer.draw(audience, now / 1000, dt);
+      if (screenScene) screenScene.update(dt);
       raf = requestAnimationFrame(frame);
     };
     const begin = () => { last = performance.now(); raf = requestAnimationFrame(frame); };
@@ -131,7 +134,7 @@
 
     // Read-only handle for automated tests / console inspection (nothing is rendered).
     window.__cinema = {
-      config: cfg, audience, connection, renderer,
+      config: cfg, audience, connection, renderer, screenScene,
       snapshot: () => Object.assign(audience.snapshot(), { connection: connection ? connection.state : 'demo' })
     };
   }

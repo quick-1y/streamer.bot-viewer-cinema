@@ -52,6 +52,35 @@ window.CINEMA_CONFIG = {
 
   rememberAudience: true,   // ?remember=0 disables local audience persistence
 
+  // ---- Содержимое экрана: starting.html, break.html, ending.html ----
+  startingText: 'Стрим скоро начнется', // ?text= переопределяет текст стартовой сцены
+  // Ссылка именно на встраиваемый чат (виджет), разрешающий iframe.
+  // Например, Browser Source URL вашего чат-виджета. Не ссылка на канал.
+  chatUrl: '',                         // ?chatUrl= (URL должен быть закодирован)
+  // Альтернатива iframe: Twitch-чат через Streamer.bot, без внешнего виджета.
+  // В break.html?chatMode=streamerbot используются Twitch.ChatMessage.
+  chatMode: 'streamerbot',             // streamerbot | embed; chatUrl включает embed
+  breakText: 'Перерыв. Скоро вернусь!',
+  endingText: 'Стрим завершен',         // ?text= в ending.html
+  thanksText: 'Спасибо, что были с нами!', // ?thanks=
+  creditsSpeed: 45,                    // ?creditsSpeed= скорость прокрутки, px/сек экрана
+  creditsIntroSeconds: 4,              // ?creditsIntro= длительность вступления
+  // Порядок и заголовки групп. path — точный путь массива в ответе GetCredits.
+  // donors — пользовательская группа Streamer.bot; см. раздел README о донатерах.
+  creditsGroups: [
+    { title: 'Наши зрители', path: ['users', 'users'] },
+    { title: 'Донатеры', path: ['groups', 'donors'] },
+    { title: 'Новые фолловеры', path: ['events', 'follows'] },
+    { title: 'Подписчики', path: ['events', 'subs'] },
+    { title: 'Продления подписки', path: ['events', 'resubs'] },
+    { title: 'Подаренные подписки', path: ['events', 'giftsubs'] },
+    { title: 'Массовые подарки', path: ['events', 'giftbombs'] },
+    { title: 'Поддержка Bits', path: ['events', 'cheers'] },
+    { title: 'Рейды', path: ['events', 'raided'] },
+    { title: 'Модераторы', path: ['users', 'moderators'] },
+    { title: 'VIP', path: ['users', 'vips'] }
+  ],
+
   // ---- Developer ----
   debug: false,             // ?debug=1   logs to the browser console only (never on screen)
   demo: false               // ?demo=1    simulated viewers, no Streamer.bot needed
