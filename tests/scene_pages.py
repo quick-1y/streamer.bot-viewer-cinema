@@ -55,7 +55,7 @@ def main():
             page.on('pageerror', lambda e: errors.append(str(e)))
 
             def open_scene(name, **params):
-                q = {'port': PORT, 'remember': 0, 'poll': 0, **params}
+                q = {'port': PORT, 'remember': 0, 'poll': 0, 'chatUrl': '', **params}
                 page.goto(f'http://127.0.0.1:{server.server_port}/{name}.html?' + urllib.parse.urlencode(q))
                 page.wait_for_function('window.__cinema !== undefined')
                 if not params.get('demo'):
@@ -92,15 +92,34 @@ def main():
             check('bounded chat buffer keeps latest messages', 2 <= page.locator('.chat-line').count() <= 20)
             open_scene('break', chatUrl=f'http://127.0.0.1:{server.server_port}/index.html?demo=1')
             check('widget URL uses isolated iframe', page.locator('iframe').get_attribute('src').endswith('index.html?demo=1'))
+            check('iframe uses readable viewport and dark backing', page.evaluate("""() => {
+                const f=document.querySelector('iframe'), box=f.parentElement;
+                return f.clientWidth===500 && f.clientHeight===200 && getComputedStyle(box).backgroundColor==='rgb(25, 21, 25)';
+            }"""))
+            # Synthetic widget fixture: no personal URL or exported configuration.
+            widget_url = "https://chat-widget.example/overlay?" + urllib.parse.urlencode({"config": "sample+/=&value"})
+            page.route('https://chat-widget.example/overlay?*', lambda route: route.fulfill(
+                content_type='text/html', body='<meta charset="utf-8"><body style="margin:0;color:white;background:transparent;font:20px Arial">Проверка виджета</body>'))
+            open_scene('break', demo=1, chatUrl=widget_url)
+            page.wait_for_function('window.__cinema !== undefined')
+            widget = page.frame_locator('iframe')
+            widget.get_by_text('Проверка виджета', exact=True).wait_for()
+            check('no personal chat URL in default config', page.evaluate("CINEMA_CONFIG.chatUrl === ''"))
+            check('synthetic widget URL loads inside screen', widget.locator('body').inner_text() == 'Проверка виджета')
+            check('nested config URL preserved without double decoding', page.evaluate("""() => {
+                const url=new URL(document.querySelector('iframe').src);
+                return url.hostname==='chat-widget.example' && url.searchParams.get('config')==='sample+/=&value';
+            }"""))
+            page.unroute('https://chat-widget.example/overlay?*')
             open_scene('break', chatUrl='javascript:alert(1)')
             check('invalid widget URL rejected', page.locator('iframe').count() == 0)
 
             fixture = {'users': {'users': ['alice', 'Alice', 'Котейка'], 'moderators': []},
-                       'events': {'follows': ['Новый'], 'subs': ['Подписчик']}, 'groups': {'donors': ['Донатер']}}
+                       'events': {'follows': ['Новый'], 'subs': ['Подписчик']}}
             ctl('/credits', fixture)
             open_scene('ending', creditsIntro=0, creditsSpeed=300)
             page.wait_for_function('__cinema.screenScene.loaded')
-            check('GetCredits consumed, groups ordered, names deduplicated', page.evaluate("__cinema.screenScene.groups.map(g=>g.names)") == [['alice', 'Котейка'], ['Донатер'], ['Новый'], ['Подписчик']])
+            check('GetCredits consumed, groups ordered, names deduplicated', page.evaluate("__cinema.screenScene.groups.map(g=>g.names)") == [['alice', 'Котейка'], ['Новый'], ['Подписчик']])
             page.wait_for_selector('.credits-roll')
             before = page.evaluate('__cinema.screenScene.offset')
             page.wait_for_timeout(250)
@@ -111,10 +130,34 @@ def main():
             check('reconnect does not restart credits', page.evaluate('__cinema.screenScene.loaded && __cinema.screenScene.phase !== "intro"'))
             page.wait_for_function("__cinema.screenScene.phase === 'thanks'", timeout=15000)
             check('thanks remains after credits', page.locator('.screen-message').inner_text() == 'Спасибо, что были с нами!')
+            # Older scrolling credits resolves section/key names case-insensitively.
+            variants = [
+                ('case-insensitive section and event keys', {'Users': {'Users': ['Зритель']}, 'Events': {'reSubs': ['Продление'], 'giftSubs': ['Подарок']}}, [['Зритель'], ['Продление'], ['Подарок']]),
+                ('enabled subscribers category from old headers', {'users': {'subscribers': ['Саб'], 'editors': ['Редактор']}}, [['Саб'], ['Редактор']]),
+                ('enabled Hype Train and top categories', {'hypeTrain': {'conductors': ['Проводник']}, 'top': {'monthBits': ['Топ']}}, [['Проводник'], ['Топ']]),
+                ('events without enabled Users category', {'events': {'follows': ['Фолловер']}}, [['Фолловер']]),
+                ('wrapped Credits response', {'credits': {'EVENTS': {'FOLLOWS': ['Обёртка']}}}, [['Обёртка']]),
+            ]
+            for label, payload, expected in variants:
+                ctl('/credits', payload)
+                open_scene('ending', creditsIntro=0, creditsSpeed=300)
+                page.wait_for_function("__cinema.screenScene.loaded || __cinema.screenScene.phase==='error'")
+                check(label, page.evaluate('__cinema.screenScene.groups.map(g=>g.names)') == expected)
+            ctl('/credits', {'unexpected': ['not credits']})
+            open_scene('ending')
+            page.wait_for_function("__cinema.screenScene.phase==='error'")
+            check('malformed Credits remains an error', not page.evaluate('__cinema.screenScene.loaded'))
             ctl('/credits', {'users': {'users': []}, 'events': {}})
             open_scene('ending', creditsIntro=0, thanks='До встречи!')
+            page.wait_for_function("__cinema.screenScene.phase==='empty'")
+            check('empty credits are explained on screen', 'нет записей' in page.locator('.screen-message').inner_text())
             page.wait_for_function("__cinema.screenScene.phase==='thanks'")
-            check('empty credits skip to customized thanks', page.locator('.screen-message').inner_text() == 'До встречи!')
+            check('empty credits end with customized thanks', page.locator('.screen-message').inner_text() == 'До встречи!')
+            ctl('/credits', {'custom': {'unconfigured': ['Запись']}})
+            open_scene('ending', creditsIntro=0)
+            page.wait_for_function("__cinema.screenScene.phase==='empty'")
+            check('unmatched category distinguished from empty Credits', 'выбранные группы' in page.locator('.screen-message').inner_text())
+            check('diagnostics contain paths/counts without names', page.evaluate('__cinema.screenScene.creditsDiagnostics') == [{'path': ['custom', 'unconfigured'], 'count': 1}])
             ctl('/credits?error=1', {})
             open_scene('ending')
             page.wait_for_function("__cinema.screenScene.phase==='error'")
@@ -123,7 +166,7 @@ def main():
             ctl('/drop')
             page.wait_for_function("__cinema.snapshot().connection!=='ready'")
             page.wait_for_function('__cinema.screenScene.loaded', timeout=15000)
-            check('failed Credits request retries after reconnect', page.evaluate('__cinema.screenScene.groups.length') == 4)
+            check('failed Credits request retries after reconnect', page.evaluate('__cinema.screenScene.groups.length') == 3)
             open_scene('index', demo=1)
             check('original index keeps blank screen', page.locator('.cinema-screen').count() == 0)
             check('no browser errors', not errors)

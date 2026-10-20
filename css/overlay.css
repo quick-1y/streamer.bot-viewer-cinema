@@ -104,7 +104,15 @@ html, body {
 .chat-line { flex: 0 0 auto; font-size: 29px; line-height: 1.15; overflow-wrap: anywhere; white-space: pre-wrap; }
 .chat-line strong { color: #8f332b; }
 .chat-empty { font-size: 30px; opacity: .7; }
-.screen-chat iframe { width: 100%; height: 100%; border: 0; background: transparent; }
+/* Widget viewport is 500×200, projected to the screen's 1000×400 plane.
+ * This keeps the exported chat's 20px font readable at a 1920×1080 OBS size.
+ * Transparent widgets normally use light text, so give them a dark backing.
+ */
+.screen-chat.is-embed { padding: 0; background: #191519; }
+.screen-chat iframe {
+  display: block; width: 50%; height: 50%; border: 0; background: transparent;
+  transform: scale(2); transform-origin: 0 0;
+}
 .cinema-screen.is-credits { background: #191519; color: #fff1d5; }
 .credits-roll { position: absolute; left: 45px; right: 45px; top: 0; text-align: center; will-change: transform; }
 .credits-group { margin-bottom: 65px; }

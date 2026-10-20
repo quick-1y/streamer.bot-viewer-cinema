@@ -4,11 +4,20 @@
   const VC = window.VC, W = 1000, H = 400;
   const str = (v, d) => typeof v === 'string' ? v : d;
   const number = (v, d, min, max) => v !== undefined && v !== null && Number.isFinite(+v) ? VC.clamp(+v, min, max) : d;
+  const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  // Streamer.bot versions/custom categories may differ in key casing. The old
+  // scrolling credits uses the same case-insensitive section/key lookup.
+  function field(data, key) {
+    if (!record(data) || typeof key !== 'string') return undefined;
+    const ownKey = Object.prototype.hasOwnProperty.call(data, key) ? key :
+      Object.keys(data).find(k => k.toLowerCase() === key.toLowerCase());
+    return ownKey === undefined ? undefined : data[ownKey];
+  }
   function namesAt(data, path) {
     if (!Array.isArray(path) || !path.length) return [];
     for (const key of path) {
-      if (!data || !Object.prototype.hasOwnProperty.call(data, key)) return [];
-      data = data[key];
+      data = field(data, key);
+      if (data === undefined) return [];
     }
     if (!Array.isArray(data)) return [];
     const seen = new Set();
@@ -31,7 +40,7 @@
         this.el.classList.add('is-credits');
         this.message(this.q.get('text') ?? str(cfg.endingText, 'Стрим завершен'));
         if (cfg.demo) this.acceptCredits({ users: { users: ['Котейка', 'Aurora', 'NightRain'] },
-          events: { follows: ['Новый_зритель'], subs: ['Sakura'], cheers: ['Pixel'] }, groups: { donors: ['СпасибоЗаПоддержку'] } });
+          events: { follows: ['Новый_зритель'], subs: ['Sakura'], cheers: ['Pixel'] } });
       }
       this.position();
     }
@@ -66,7 +75,7 @@
           const iframe = document.createElement('iframe'); iframe.title = 'Чат стрима'; iframe.src = parsed.href;
           iframe.referrerPolicy = 'strict-origin-when-cross-origin';
           iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-          box.style.padding = '0'; box.appendChild(iframe);
+          box.classList.add('is-embed'); box.appendChild(iframe);
         } catch (_) { this.message('Укажите ссылку на виджет чата в chatUrl'); }
         return;
       }
@@ -106,13 +115,17 @@
       if (this.mode === 'ending') connection.on('ready', () => this.fetchCredits(connection));
     }
     async fetchCredits(connection) {
-      if (this.loaded || this.loading) return;
+      if (this.loading || (this.loaded && this.groups.length)) return;
       this.loading = true;
       try {
         const res = await connection.request({ request: 'GetCredits' });
         if (!res || res.status !== 'ok') throw new Error(res && res.error || 'GetCredits failed');
-        const data = res.credits || res;
-        if (!data.users || typeof data.users !== 'object' || Array.isArray(data.users)) throw new Error('Invalid Credits payload');
+        const data = field(res, 'credits') ?? res;
+        // Users Present can be disabled while event/custom Credits remain valid.
+        // Still reject malformed payloads instead of silently showing empty credits.
+        if (!record(data) || !['users', 'events', 'groups', 'hypeTrain', 'top', 'custom'].some(key => record(field(data, key)))) {
+          throw new Error('Invalid Credits payload');
+        }
         this.acceptCredits(data);
       } catch (e) {
         VC.log.warn('Credits:', e.message); this.phase = 'error';
@@ -121,6 +134,18 @@
     }
     acceptCredits(data) {
       this.groups = (Array.isArray(this.cfg.creditsGroups) ? this.cfg.creditsGroups : []).map(g => ({ title: str(g.title, ''), names: namesAt(data, g.path) })).filter(g => g.names.length);
+      // Counts/paths help diagnose an empty roll without logging viewer identities.
+      this.creditsDiagnostics = [];
+      for (const section of Object.keys(data)) {
+        if (!record(data[section])) continue;
+        for (const key of Object.keys(data[section])) {
+          const entries = data[section][key];
+          if (Array.isArray(entries)) this.creditsDiagnostics.push({ path: [section, key], count: entries.length });
+        }
+      }
+      VC.log.debug('Credits arrays:', this.creditsDiagnostics);
+      if (!this.groups.length) VC.log.warn('No matching Credits entries. Check Services → Credits and creditsGroups.', this.creditsDiagnostics);
+      VC.log.debug('Credits groups:', this.groups.map(g => ({ title: g.title, count: g.names.length })));
       this.loaded = true; this.phase = 'intro'; this.elapsed = 0;
       this.message(this.q.get('text') ?? str(this.cfg.endingText, 'Стрим завершен'));
     }
@@ -141,7 +166,15 @@
       if (this.mode !== 'ending' || !this.loaded) return;
       this.elapsed += dt;
       if (this.phase === 'intro' && this.elapsed >= number(this.q.get('creditsIntro') ?? this.cfg.creditsIntroSeconds, 4, 0, 120)) {
-        if (this.groups.length) this.startRoll(); else this.finish();
+        if (this.groups.length) this.startRoll();
+        else {
+          this.phase = 'empty'; this.elapsed = 0;
+          this.message(this.creditsDiagnostics.some(entry => entry.count > 0)
+            ? 'В Credits есть записи, но выбранные группы пусты.'
+            : 'В Credits пока нет записей для титров.');
+        }
+      } else if (this.phase === 'empty' && this.elapsed >= 4) {
+        this.finish();
       } else if (this.phase === 'roll') {
         this.offset -= number(this.q.get('creditsSpeed') ?? this.cfg.creditsSpeed, 45, 5, 300) * dt;
         this.roll.style.transform = `translateY(${this.offset}px)`;

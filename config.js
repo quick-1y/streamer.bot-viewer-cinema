@@ -55,8 +55,8 @@ window.CINEMA_CONFIG = {
   // ---- Содержимое экрана: starting.html, break.html, ending.html ----
   startingText: 'Стрим скоро начнется', // ?text= переопределяет текст стартовой сцены
   // Ссылка именно на встраиваемый чат (виджет), разрешающий iframe.
-  // Например, Browser Source URL вашего чат-виджета. Не ссылка на канал.
-  chatUrl: '',                         // ?chatUrl= (URL должен быть закодирован)
+  // Browser Source URL вашего виджета. Для встроенного чата установите chatUrl: ''.
+  chatUrl: '', // ?chatUrl=; укажите свою ссылку на встраиваемый виджет чата
   // Альтернатива iframe: Twitch-чат через Streamer.bot, без внешнего виджета.
   // В break.html?chatMode=streamerbot используются Twitch.ChatMessage.
   chatMode: 'streamerbot',             // streamerbot | embed; chatUrl включает embed
@@ -66,10 +66,8 @@ window.CINEMA_CONFIG = {
   creditsSpeed: 45,                    // ?creditsSpeed= скорость прокрутки, px/сек экрана
   creditsIntroSeconds: 4,              // ?creditsIntro= длительность вступления
   // Порядок и заголовки групп. path — точный путь массива в ответе GetCredits.
-  // donors — пользовательская группа Streamer.bot; см. раздел README о донатерах.
   creditsGroups: [
     { title: 'Наши зрители', path: ['users', 'users'] },
-    { title: 'Донатеры', path: ['groups', 'donors'] },
     { title: 'Новые фолловеры', path: ['events', 'follows'] },
     { title: 'Подписчики', path: ['events', 'subs'] },
     { title: 'Продления подписки', path: ['events', 'resubs'] },
@@ -78,7 +76,19 @@ window.CINEMA_CONFIG = {
     { title: 'Поддержка Bits', path: ['events', 'cheers'] },
     { title: 'Рейды', path: ['events', 'raided'] },
     { title: 'Модераторы', path: ['users', 'moderators'] },
-    { title: 'VIP', path: ['users', 'vips'] }
+    { title: 'VIP', path: ['users', 'vips'] },
+    { title: 'Все подписчики', path: ['users', 'subscribers'] },
+    { title: 'Редакторы', path: ['users', 'editors'] },
+    { title: 'Проводники хайп-поезда', path: ['hypeTrain', 'conductors'] },
+    { title: 'Участники хайп-поезда', path: ['hypeTrain', 'contributors'] },
+    { title: 'Награды за баллы канала', path: ['events', 'rewardRedemptions'] },
+    { title: 'Вклад в цели', path: ['events', 'goalContributions'] },
+    { title: 'Строители пирамид', path: ['events', 'pyramids'] },
+    { title: 'Хайп-поезда', path: ['events', 'hypeTrains'] },
+    { title: 'Топ Bits за всё время', path: ['top', 'allBits'] },
+    { title: 'Топ Bits за месяц', path: ['top', 'monthBits'] },
+    { title: 'Топ Bits за неделю', path: ['top', 'weekBits'] },
+    { title: 'Топ баллов канала', path: ['top', 'channelRewards'] }
   ],
 
   // ---- Developer ----
