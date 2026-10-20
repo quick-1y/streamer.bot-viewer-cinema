@@ -65,6 +65,8 @@ window.CINEMA_CONFIG = {
   thanksText: 'Спасибо, что были с нами!', // ?thanks=
   creditsSpeed: 45,                    // ?creditsSpeed= скорость прокрутки, px/сек экрана
   creditsIntroSeconds: 4,              // ?creditsIntro= длительность вступления
+  creditsLoop: false,                  // ?creditsLoop=1: повторять весь цикл; false: один раз
+  creditsThanksSeconds: 4,             // ?creditsThanks= секунд благодарности перед повтором
   // Порядок и заголовки групп. path — точный путь массива в ответе GetCredits.
   creditsGroups: [
     { title: 'Наши зрители', path: ['users', 'users'] },

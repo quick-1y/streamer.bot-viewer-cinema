@@ -45,11 +45,24 @@
       this.position();
     }
     position() {
-      const r = this.renderer, p = VC.Layout.artPoint(964, 128);
-      const x = 416 * 936 / 1672 / W * r.scale;
-      const y = 416 * (344 / 639) * 527 / 941 / W * r.scale;
-      const h = 160 * 527 / 941 / H * r.scale;
-      this.el.style.transform = `matrix(${x},${y},0,${h},${r.offX + p.x * r.scale},${r.offY + p.y * r.scale})`;
+      const r = this.renderer;
+      const key = [r.scale, r.offX, r.offY].join(':');
+      if (this.positionKey === key) return;
+      this.positionKey = key;
+      const points = VC.Layout.SCREEN_ART_CORNERS.map(([x, y]) => {
+        const p = VC.Layout.artPoint(x, y);
+        return [r.offX + p.x * r.scale, r.offY + p.y * r.scale];
+      });
+      // Project the whole rectangular DOM plane onto the four painted corners.
+      // An affine skew cannot match this screen's slightly unequal side heights.
+      const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = points;
+      const sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+      const dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2;
+      const den = dx1 * dy2 - dx2 * dy1;
+      const g = (sx * dy2 - dx2 * sy) / den, h = (dx1 * sy - sx * dy1) / den;
+      const a = (x1 - x0 + g * x1) / W, b = (x3 - x0 + h * x3) / H;
+      const d = (y1 - y0 + g * y1) / W, e = (y3 - y0 + h * y3) / H;
+      this.el.style.transform = `matrix3d(${[a, d, 0, g / W, b, e, 0, h / H, 0, 0, 1, 0, x0, y0, 0, 1].join(',')})`;
     }
     message(value) {
       this.el.replaceChildren();
@@ -146,7 +159,11 @@
       VC.log.debug('Credits arrays:', this.creditsDiagnostics);
       if (!this.groups.length) VC.log.warn('No matching Credits entries. Check Services → Credits and creditsGroups.', this.creditsDiagnostics);
       VC.log.debug('Credits groups:', this.groups.map(g => ({ title: g.title, count: g.names.length })));
-      this.loaded = true; this.phase = 'intro'; this.elapsed = 0;
+      this.loaded = true;
+      this.beginCredits();
+    }
+    beginCredits() {
+      this.phase = 'intro'; this.elapsed = 0;
       this.message(this.q.get('text') ?? str(this.cfg.endingText, 'Стрим завершен'));
     }
     startRoll() {
@@ -173,6 +190,9 @@
             ? 'В Credits есть записи, но выбранные группы пусты.'
             : 'В Credits пока нет записей для титров.');
         }
+      } else if (this.phase === 'thanks' && this.elapsed >= number(this.q.get('creditsThanks') ?? this.cfg.creditsThanksSeconds, 4, 0.1, 120)) {
+        const loop = this.q.has('creditsLoop') ? ['1', 'true', 'yes'].includes(this.q.get('creditsLoop')) : this.cfg.creditsLoop === true;
+        if (loop) this.beginCredits();
       } else if (this.phase === 'empty' && this.elapsed >= 4) {
         this.finish();
       } else if (this.phase === 'roll') {
@@ -181,7 +201,7 @@
         if (this.offset < -this.roll.offsetHeight) this.finish();
       }
     }
-    finish() { this.phase = 'thanks'; this.message(this.q.get('thanks') ?? str(this.cfg.thanksText, 'Спасибо, что были с нами!')); }
+    finish() { this.phase = 'thanks'; this.elapsed = 0; this.message(this.q.get('thanks') ?? str(this.cfg.thanksText, 'Спасибо, что были с нами!')); }
   }
   VC.ScreenScene = ScreenScene;
 })();

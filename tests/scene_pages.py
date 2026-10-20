@@ -70,9 +70,21 @@ def main():
                   return s.scrollHeight<=b.clientHeight && s.scrollWidth<=b.clientWidth && s.textContent===new URLSearchParams(location.search).get('text');
                 }'''))
             check('text is never interpreted as markup', page.locator('.cinema-screen img').count() == 0)
+            def corners_match():
+                return page.evaluate('''() => {
+                  const r=__cinema.renderer, el=document.querySelector('.cinema-screen');
+                  const m=new DOMMatrix(getComputedStyle(el).transform);
+                  const measured=[[960,123],[1375,343],[1375,523],[960,290]];
+                  return [[0,0],[1000,0],[1000,400],[0,400]].every(([x,y],i)=>{
+                    const p=new DOMPoint(x,y).matrixTransform(m), target=VC.Layout.artPoint(...measured[i]);
+                    return Math.hypot(p.x/p.w-(r.offX+target.x*r.scale),p.y/p.w-(r.offY+target.y*r.scale))<.15;
+                  });
+                }''')
+            check('all four screen corners match the painted frame', corners_match())
             for width, height in [(960, 540), (2560, 1080), (3840, 2160)]:
                 page.set_viewport_size({'width': width, 'height': height})
                 page.wait_for_timeout(100)
+                check('four-corner projection stays aligned after resize', corners_match())
                 check('projected screen remains inside resized stage', page.evaluate('''() => {
                   const b=document.querySelector('.cinema-screen').getBoundingClientRect();
                   return b.left>=0 && b.top>=0 && b.right<=innerWidth && b.bottom<=innerHeight;
@@ -130,6 +142,30 @@ def main():
             check('reconnect does not restart credits', page.evaluate('__cinema.screenScene.loaded && __cinema.screenScene.phase !== "intro"'))
             page.wait_for_function("__cinema.screenScene.phase === 'thanks'", timeout=15000)
             check('thanks remains after credits', page.locator('.screen-message').inner_text() == 'Спасибо, что были с нами!')
+            # Exercise two full cycles, including both messages, without wall-clock delays.
+            open_scene('ending', creditsIntro=.2, creditsThanks=.2, creditsSpeed=300)
+            page.wait_for_function('__cinema.screenScene.loaded')
+            cycle = page.evaluate('''() => {
+              const s=__cinema.screenScene;
+              s.cfg.creditsLoop=true; s.beginCredits();
+              const phases=[s.phase], messages=[s.el.textContent];
+              for(let i=0;i<2000 && phases.filter(p=>p==='thanks').length<2;i++) {
+                s.update(.1);
+                if(s.phase!==phases[phases.length-1]) { phases.push(s.phase); messages.push(s.el.textContent); }
+              }
+              return {phases,messages};
+            }''')
+            check('config loop repeats intro, roll and thanks in order', cycle['phases'] == ['intro','roll','thanks','intro','roll','thanks'])
+            check('both repeated cycles display customized stage messages', cycle['messages'][0] == cycle['messages'][3] == 'Стрим завершен' and cycle['messages'][2] == cycle['messages'][5] == 'Спасибо, что были с нами!')
+            check('query can turn config loop off and retain final thanks', page.evaluate('''() => {
+              const s=__cinema.screenScene; s.q.set('creditsLoop','0'); s.update(20);
+              return s.phase==='thanks';
+            }'''))
+            check('query can turn loop on after thanks duration', page.evaluate('''() => {
+              const s=__cinema.screenScene; s.cfg.creditsLoop=false; s.q.set('creditsLoop','1'); s.finish();
+              s.update(.1); const waiting=s.phase==='thanks'; s.update(.11);
+              return waiting && s.phase==='intro';
+            }'''))
             # Older scrolling credits resolves section/key names case-insensitively.
             variants = [
                 ('case-insensitive section and event keys', {'Users': {'Users': ['Зритель']}, 'Events': {'reSubs': ['Продление'], 'giftSubs': ['Подарок']}}, [['Зритель'], ['Продление'], ['Подарок']]),
