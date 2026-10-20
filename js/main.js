@@ -42,14 +42,10 @@
   async function start() {
     await VC.Art.ready;
     const cfg = readConfig();
-    // Cached decoration text must be measured with the actual bundled font.
+    // Measure signs, viewer labels and fitted screen text with the bundled font.
     if (document.fonts && document.fonts.load) {
-      await document.fonts.load('700 48px "Pixelify Sans"').catch(() => {});
-      if (VC.ScreenScene) {
-        // Load screen typography before measuring fitted titles and credits.
-        await Promise.all([400, 500, 600].map(weight =>
-          document.fonts.load(`${weight} 48px "Inter"`))).catch(() => {});
-      }
+      await Promise.all([400, 500, 600, 700].map(weight =>
+        document.fonts.load(`${weight} 48px "Inter"`))).catch(() => {});
     }
     await VC.Decor.ready(cfg.posters);
     await VC.Art.configureRugs(cfg.rugs);

@@ -142,6 +142,7 @@ def main():
             page.wait_for_function('__cinema.screenScene.loaded')
             check('GetCredits consumed, groups ordered, names deduplicated', page.evaluate("__cinema.screenScene.groups.map(g=>g.names)") == [['alice', 'Котейка'], ['Новый'], ['Подписчик']])
             page.wait_for_selector('.credits-roll')
+            check('credits names and headings use Inter', page.evaluate("""() => ['.credits-name','.credits-group h2'].every(selector => getComputedStyle(document.querySelector(selector)).fontFamily.includes('Inter'))"""))
             before = page.evaluate('__cinema.screenScene.offset')
             page.wait_for_timeout(250)
             check('credits scroll with animation', page.evaluate('__cinema.screenScene.offset') < before)
@@ -214,6 +215,13 @@ def main():
             check('failed Credits request retries after reconnect', page.evaluate('__cinema.screenScene.groups.length') == 3)
             open_scene('index', demo=1)
             check('original index keeps blank screen', page.locator('.cinema-screen').count() == 0)
+            check('viewer labels and counter use loaded Inter on index', page.evaluate("""() => {
+                const r=__cinema.renderer;
+                return r.font.includes('Inter') && r.lctx.font.includes('Inter') &&
+                  getComputedStyle(document.querySelector('.counter')).fontFamily.includes('Inter') &&
+                  [...document.fonts].some(f=>f.family==='Inter' && f.status==='loaded');
+            }"""))
+
             check('no browser errors', not errors)
             shots = Path(os.environ.get('SHOTS', '/tmp/cinema-scenes'))
             shots.mkdir(parents=True, exist_ok=True)

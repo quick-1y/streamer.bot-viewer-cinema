@@ -95,7 +95,7 @@
       this.labels.height = Math.round(vh * dpr);
       Object.assign(this.labels.style, { width: vw + 'px', height: vh + 'px' });
       this.fontPx = VC.clamp(Math.round(scale * 9), 12, 34);
-      this.font = `600 ${this.fontPx}px "Pixelify Sans", "Trebuchet MS", sans-serif`;
+      this.font = `600 ${this.fontPx}px "Inter", "Segoe UI", Arial, sans-serif`;
       this.widthCache = new Map();
       if (this.counterEl) this.counterEl.style.setProperty('--u', (scale / (1920 / L.VIEW_W)).toFixed(3));
     }
