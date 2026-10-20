@@ -63,6 +63,15 @@ def main():
 
             open_scene('starting', demo=1)
             check('starting default text and same cinema canvas', page.locator('.screen-message').inner_text() == 'Стрим скоро начнется' and page.locator('canvas.world').count() == 1)
+            check('welcome uses dark screen and light text', page.evaluate("""() => {
+                const style=getComputedStyle(document.querySelector('.cinema-screen'));
+                return style.backgroundColor==='rgb(25, 21, 25)' && style.color==='rgb(245, 245, 245)';
+            }"""))
+            check('local Inter is loaded before screen text fitting', page.evaluate("""() => {
+                const style=getComputedStyle(document.querySelector('.screen-message span'));
+                return style.fontFamily.includes('Inter') && [...document.fonts].some(f=>f.family==='Inter' && f.status==='loaded');
+            }"""))
+
             for value in ['Скоро начнем!', 'Очень длинный текст ' * 120, 'Длинноеслово' * 100, '<img src=x onerror=alert(1)>', 'Первая строка\nВторая строка']:
                 open_scene('starting', demo=1, text=value)
                 check('custom text fits both dimensions', page.evaluate('''() => {
