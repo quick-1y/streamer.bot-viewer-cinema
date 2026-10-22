@@ -486,7 +486,7 @@ def main():
             scales.append(pg.evaluate('__cinema.renderer.scale'))
         check('14h. OBS resolutions use exact 1x, 2x and 4x pixel scales', scales == [1,2,4], str(scales))
         check('14i. illustrated assets loaded and render at native 1080p', pg.evaluate(
-            "Object.keys(VC.Art.images).length === 7 && __cinema.renderer.world.width === 1920 && __cinema.renderer.world.height === 1080"))
+            "Object.keys(VC.Art.images).length === 8 && __cinema.renderer.world.width === 1920 && __cinema.renderer.world.height === 1080"))
         geometry = pg.evaluate("""() => {
             const seats=VC.Layout.buildSeats(60), c=VC.Layout.FLOOR.corners;
             const edge=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;

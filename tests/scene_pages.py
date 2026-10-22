@@ -311,6 +311,45 @@ def main():
                       });
                 }));
             }"""))
+            check('thin texture triangles join without transparent seams', page.evaluate("""() => {
+                const image=document.createElement('canvas'); image.width=80;image.height=128;
+                const source=image.getContext('2d');source.fillStyle='#345678';source.fillRect(0,0,80,128);
+                const result=document.createElement('canvas');result.width=80;result.height=128;
+                const ctx=result.getContext('2d');
+                // The old centroid expansion left visible lines on these narrow cells.
+                for(let y=10;y<110;y+=4){
+                    const points=[[10,y],[70,y],[70,y+4],[10,y+4]];
+                    for(const indices of [[0,1,2],[0,2,3]]){
+                        const triangle=indices.map(i=>points[i]);
+                        VC.drawTexturedTriangle(ctx,image,triangle,triangle,.65);
+                    }
+                }
+                const pixels=ctx.getImageData(12,12,56,96).data;
+                for(let i=3;i<pixels.length;i+=4)if(pixels[i]<250)return false;
+                return true;
+            }"""))
+            check('expanded mesh clips cannot sample distant pixels outside their source cell', page.evaluate("""() => {
+                const image=document.createElement('canvas');image.width=64;image.height=64;
+                const paint=image.getContext('2d');paint.fillStyle='#00ff00';paint.fillRect(0,0,64,64);paint.clearRect(16,16,16,16);
+                function pixels(bounds){
+                    const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
+                    VC.drawTexturedTriangle(canvas.getContext('2d'),image,
+                      [[20,20],[24,20],[24,24]],[[10,10],[14,10],[14,10.1]],.55,bounds);
+                    return canvas.getContext('2d').getImageData(0,0,64,64).data.some((v,i)=>i%4===3&&v>0);
+                }
+                return pixels(null) && !pixels([20,20,4,4]);
+            }"""))
+            check('older rear poses use rear artwork rather than transplanted front legs', page.evaluate("""() => {
+                if(!VC.Art.images.viewersBack.complete) return false;
+                return Array.from({length:8},(_,seed)=>VC.Art.sprites(seed)).every(sp=>{
+                    const mirrored=document.createElement('canvas');mirrored.width=80;mirrored.height=128;
+                    const ctx=mirrored.getContext('2d');ctx.translate(80,0);ctx.scale(-1,1);ctx.drawImage(sp.front[0],0,0);
+                    const front=ctx.getImageData(0,94,80,34).data;
+                    const back=sp.back[0].getContext('2d').getImageData(0,94,80,34).data;
+                    let different=0;for(let i=0;i<back.length;i++)if(front[i]!==back[i])different++;
+                    return different>500;
+                });
+            }"""))
             check('walking phase follows actual distance, stops when blocked and advances on exit', page.evaluate("""() => {
                 const a=new VC.Actor({key:'walk-test'}, VC.Layout.buildSeats(60)[30]);
                 a.s=a.seatStart-0.01;
