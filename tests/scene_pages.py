@@ -293,9 +293,37 @@ def main():
                   [...document.fonts].some(f=>f.family==='Inter' && f.status==='loaded');
             }"""))
 
-            check('sprite frames are shared by the 32 rendered variants', page.evaluate("""() => {
-                const frames=Array.from({length:64},(_,seed)=>VC.Art.sprites(seed));
-                return new Set(frames).size===32 && VC.Art.sprites(0)===VC.Art.sprites(8);
+            check('sprite frames are shared by the 48 rendered variants', page.evaluate("""() => {
+                const frames=Array.from({length:192},(_,seed)=>VC.Art.sprites(seed));
+                return new Set(frames).size===48 && VC.Art.sprites(0)===VC.Art.sprites(8);
+            }"""))
+            check('all outfits have eight distinct unclipped walking frames in both directions', page.evaluate("""() => {
+                const variants = new Set(Array.from({length:192},(_,seed)=>VC.Art.sprites(seed)));
+                return [...variants].every(sp => ['front','back'].every(view => {
+                    const frames=sp[view];
+                    return frames.length===9 && new Set(frames.slice(1).map(c=>c.toDataURL())).size===8 &&
+                      frames.every(c=>{
+                        const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+                        for(let x=0;x<c.width;x++) {
+                          if(pixels[x*4+3]>16 || pixels[((c.height-1)*c.width+x)*4+3]>16) return false;
+                        }
+                        return true;
+                      });
+                }));
+            }"""))
+            check('walking phase follows actual distance, stops when blocked and advances on exit', page.evaluate("""() => {
+                const a=new VC.Actor({key:'walk-test'}, VC.Layout.buildSeats(60)[30]);
+                a.s=a.seatStart-0.01;
+                a.advance(1, [], 1);
+                if(Math.abs(a.walkClock-0.01)>1e-8) return false;
+                a.advance(1, [], 1);
+                if(a.moving || Math.abs(a.walkClock-0.01)>1e-8) return false;
+                a.advance(0.1, [], -1);
+                if(!a.moving || Math.abs(a.walkClock-0.31)>1e-8) return false;
+                a.s=0;
+                a.blocked=()=>true;
+                a.advance(0.1, [], 1);
+                return Math.abs(a.walkClock-0.31)<1e-8;
             }"""))
             page.route('**/assets/art/cinema-chair.png', lambda route: route.abort())
             page.goto(f'http://127.0.0.1:{server.server_port}/index.html?demo=1')

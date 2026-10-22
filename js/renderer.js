@@ -189,7 +189,8 @@
       } else {
         const front = a.facing === 'SW' || a.facing === 'SE';
         const set = front ? sp.front : sp.back;
-        const f = a.moving ? 1 + (Math.floor(a.walkClock * 3.2) % 4) : 0;
+        const frames = set.length - 1;
+        const f = a.moving ? 1 + Math.floor(a.walkClock / sp.strideDistance * frames) % frames : 0;
         img = set[f];
         flip = a.facing === 'SE' || a.facing === 'NW';
         y -= Math.round(a.sit * 4);

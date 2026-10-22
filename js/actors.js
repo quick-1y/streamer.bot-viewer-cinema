@@ -193,9 +193,11 @@
         return;
       }
       this.blockedFor = Math.max(0, this.blockedFor - dt * 2);
+      const previous = this.s;
       this.s = VC.clamp(this.s + WALK_SPEED * dt * sign, 0, this.seatStart);
-      this.moving = true;
-      this.walkClock += dt * WALK_SPEED;
+      const distance = Math.abs(this.s - previous);
+      this.moving = distance > 0;
+      this.walkClock += distance;
       this.basePos = this.sample(this.s);
     }
 

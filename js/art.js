@@ -9,7 +9,8 @@
     rug2: 'assets/art/rug-2.png',
     chair: 'assets/art/cinema-chair.png',
     viewers: 'assets/art/viewers.png',
-    viewersExtra: 'assets/art/viewers-extra.png'
+    viewersExtra: 'assets/art/viewers-extra.png',
+    viewersDiverse: 'assets/art/viewers-diverse.png'
   };
   A.ready = Promise.all(
     Object.entries(sources).map(
@@ -71,11 +72,18 @@
       [770, 1159, 228, 270]
     ]
   ];
-  // Leg geometry per atlas row in pose-canvas pixels: [front split between the
-  // feet, centre of the back-view legs]. Measured offline from the PNGs, because
+  const diverseCrops = [
+    [[142, 27, 149, 361], [440, 31, 150, 354], [746, 84, 224, 276]],
+    [[134, 398, 161, 363], [431, 397, 164, 362], [752, 451, 236, 281]],
+    [[135, 766, 158, 366], [438, 768, 157, 359], [768, 820, 221, 287]],
+    [[128, 1134, 165, 373], [435, 1133, 168, 371], [757, 1184, 244, 292]]
+  ];
+  // Leg geometry per atlas row in pose-canvas pixels: front/back splits between
+  // the feet. Older back poses reuse mirrored front legs. Measured offline:
   // reading pixels back is forbidden when the overlay runs from file:// (OBS).
-  const legs = [[41, 40], [40, 40], [40, 41], [40, 41]];
-  const extraLegs = [[43, 39.5], [41, 40], [43, 39.5], [42, 40.5]];
+  const legs = [41, 40, 40, 40].map(split => [split, 80 - split]);
+  const extraLegs = [43, 41, 43, 42].map(split => [split, 80 - split]);
+  const diverseLegs = [[40, 40], [40, 40], [40, 40], [40, 40]];
   function canvas(w, h) {
     const c = document.createElement('canvas');
     c.width = w;
@@ -321,57 +329,57 @@
     shadow.restore();
     return { cushion, back, ax: 31, ay: 46, w: 50, h: 50 };
   };
-  // The sheets only paint the front view standing. Walking towards the camera
-  // animates its legs: each leg is stretched or shortened from the hip and its
-  // foot swung sideways, alternating so one foot reaches forward (down-left on
-  // screen, the SW walking direction) while the other lifts behind.
   const HIP = 90;
-  function stride(c, frame, split) {
-    const ctx = c.getContext('2d');
-    const band = canvas(80, 128 - HIP);
-    band.getContext('2d').drawImage(c, 0, HIP, 80, 128 - HIP, 0, 0, 80, 128 - HIP);
-    ctx.clearRect(0, HIP, 80, 128 - HIP);
-    // frame 1: left leg forward, 2: passing, 3: right leg forward, 4: passing
-    const reach = [0, 8, 2, -8, -2][frame];
-    const h = 128 - HIP;
-    const leg = (x0, x1, grow, swing) => {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x0 + Math.min(0, swing) - 2, HIP, x1 - x0 + Math.abs(swing) + 4, h + 4);
-      ctx.clip();
-      // Hip fixed; the foot moves by `swing` px sideways and `grow` px down.
-      ctx.setTransform(1, 0, swing / h, (h + grow) / h, -swing / h * HIP, -grow / h * HIP);
-      ctx.drawImage(band, x0, 0, x1 - x0, h, x0, HIP, x1 - x0, h);
-      ctx.restore();
-    };
-    // The leg further from the camera is drawn first.
-    const left = () => leg(0, split, reach, -Math.max(0, reach) * 0.6);
-    const right = () => leg(split, 80, -reach, -Math.max(0, -reach) * 0.35);
-    if (reach >= 0) { right(); left(); } else { left(); right(); }
+  const WALK_FRAMES = 8;
+  // Each leg has rigid thigh and shin pieces (including the shoe). Joints rotate;
+  // leg length and shoe width stay constant throughout the cycle. No pixel readback is
+  // needed, so this also works with local files in OBS.
+  function walkPose(source, phase, split, front, mirroredLegs) {
+    const c = canvas(80, 128), ctx = c.getContext('2d');
+    const direction = front ? 1 : -1;
+    const rotate = (point, pivot, angle) => ({
+      x: pivot.x + (point.x - pivot.x) * Math.cos(angle) - (point.y - pivot.y) * Math.sin(angle),
+      y: pivot.y + (point.x - pivot.x) * Math.sin(angle) + (point.y - pivot.y) * Math.cos(angle)
+    });
+    const legs = [0, 1].map(side => {
+      const t = (phase + side * 0.5) % 1;
+      const swing = t >= 0.5, u = swing ? (t - 0.5) * 2 : t * 2;
+      const travel = swing ? -Math.cos(u * Math.PI) : 1 - 2 * u;
+      const hip = { x: split + (side ? 6 : -6), y: HIP };
+      const knee = { x: hip.x, y: 106 };
+      const ankle = mirroredLegs
+        ? { x: hip.x + (side ? 1 : 0), y: side ? 116 : 119 }
+        : { x: hip.x + (side ? 0 : -1), y: side ? 119 : 116 };
+      const upperAngle = direction * travel * 0.18;
+      const lowerAngle = upperAngle - direction * (swing ? Math.sin(u * Math.PI) * 0.48 : 0);
+      const targetKnee = rotate(knee, hip, upperAngle);
+      const rotatedAnkle = rotate(ankle, knee, lowerAngle);
+      const targetAnkle = { x: targetKnee.x + rotatedAnkle.x - knee.x, y: targetKnee.y + rotatedAnkle.y - knee.y };
+      return { side, hip, knee, ankle, targetKnee, targetAnkle, upperAngle, lowerAngle, swing };
+    });
+    // The supporting foot sets the body height; the other bends at the knee
+    // and clears the floor. Both segments retain the source artwork's length.
+    const support = legs.find(leg => !leg.swing);
+    const bob = support.ankle.y - support.targetAnkle.y;
+    const ordered = mirroredLegs ? [...legs].reverse() : legs;
+    for (const leg of ordered) {
+      const x = leg.side ? split : 0, width = leg.side ? 80 - split : split;
+      function piece(y, height, pivot, destination, rotation) {
+        ctx.save();
+        ctx.translate(destination.x, destination.y + bob);
+        ctx.rotate(rotation);
+        ctx.drawImage(source, x, y, width, height, x - pivot.x, y - pivot.y, width, height);
+        ctx.restore();
+      }
+      piece(HIP - 2, 20, leg.hip, leg.hip, leg.upperAngle);
+      piece(103, 25, leg.knee, leg.targetKnee, leg.lowerAngle);
+    }
+    // Keep the jacket over the hip seams.
+    ctx.drawImage(source, 0, 0, 80, HIP + 2, 0, bob, 80, HIP + 2);
+    return c;
   }
 
-  // The back view is painted mid-stride. Frame 1 keeps it, frame 3 mirrors the
-  // legs about their own centre (the other foot forward) and frames 2/4 draw
-  // them drawn together as the feet pass each other.
-  function gait(c, frame, mid) {
-    if (frame === 1) return;
-    const ctx = c.getContext('2d'), h = 128 - HIP;
-    const band = canvas(80, h);
-    band.getContext('2d').drawImage(c, 0, HIP, 80, h, 0, 0, 80, h);
-    ctx.clearRect(0, HIP, 80, h);
-    ctx.save();
-    // Stretch from the hip so the waist stays joined to the jacket.
-    const sx = frame === 3 ? -1 : 0.58;
-    ctx.beginPath();
-    ctx.rect(0, HIP, 80, h);
-    ctx.clip();
-    ctx.translate(mid, 0);
-    ctx.scale(sx, 1);
-    ctx.drawImage(band, -mid, HIP);
-    ctx.restore();
-  }
-
-  // Preserve existing viewers' atlas selections while storing only the style seed.
+  // Keep appearance seeds stable across reloads and scenes.
   const HAIR = [
     '#1d1515',
     '#2e1f17',
@@ -434,31 +442,40 @@
     return VC.hash(hair + shirt + style);
   };
 
-  // Only 32 atlas/row/palette combinations exist; share their immutable frames.
+  // Share immutable frames for the 48 atlas/row/palette combinations.
   const spriteCache = new Map();
   A.sprites = function (hash) {
-    const key = hash & 0x37;
+    const atlasIndex = (hash >>> 6) % 3 === 2 ? 2 : (hash >>> 2) % 2;
+    const key = atlasIndex * 16 + (hash & 3) * 4 + ((hash >>> 4) & 3);
     if (spriteCache.has(key)) return spriteCache.get(key);
     const row = hash % 4,
-      atlasCrops = (hash >>> 2) % 2 ? extraCrops : crops,
-      atlas = (hash >>> 2) % 2 ? A.images.viewersExtra : A.images.viewers,
-      leg = ((hash >>> 2) % 2 ? extraLegs : legs)[row],
+      atlasCrops = [crops, extraCrops, diverseCrops][atlasIndex],
+      atlas = [A.images.viewers, A.images.viewersExtra, A.images.viewersDiverse][atlasIndex],
+      leg = [legs, extraLegs, diverseLegs][atlasIndex][row],
       scale = 116 / atlasCrops[row][0][3];
-    function pose(col, frame = 0) {
+    function pose(col, tint = true) {
       const c = canvas(80, 128),
         ctx = c.getContext('2d');
       const [x, y, w, h] = atlasCrops[row][col];
       const dw = w * scale,
-        dh = h * scale,
-        bob = frame ? [0, -1, 0, 1][frame - 1] : 0;
+        dh = h * scale;
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(atlas, x, y, w, h, (80 - dw) / 2, 124 - dh + bob, dw, dh);
-      if (col === 0 && frame) stride(c, frame, leg[0]);
-      else if (col === 1 && frame) gait(c, frame, leg[1]);
+      ctx.drawImage(atlas, x, y, w, h, (80 - dw) / 2, 124 - dh, dw, dh);
+      // Older sheets paint the back view mid-stride. Reuse the same outfit's
+      // standing legs, facing away, instead of mirroring crossed walking legs.
+      if (col === 1 && atlasIndex < 2) {
+        const standing = pose(0, false);
+        ctx.clearRect(0, HIP, 80, 128 - HIP);
+        ctx.save();
+        ctx.translate(80, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(standing, 0, HIP, 80, 128 - HIP, 0, HIP, 80, 128 - HIP);
+        ctx.restore();
+      }
       // Stable, restrained wardrobe variations; face and hair retain their artwork.
       const hue = [-18, 0, 18, 36][(hash >>> 4) % 4];
-      if (hue) {
+      if (hue && tint) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(0, 54, 80, 42);
@@ -471,8 +488,9 @@
       return c;
     }
     const sprites = {
-      front: [0, 1, 2, 3, 4].map((f) => pose(0, f)),
-      back: [0, 1, 2, 3, 4].map((f) => pose(1, f)),
+      front: [],
+      back: [],
+      strideDistance: 1.25,
       sit: pose(2),
       w: 40,
       h: 64,
@@ -482,6 +500,12 @@
       seatOffset: 16,
       seatShift: 8
     };
+    for (const [name, col] of [['front', 0], ['back', 1]]) {
+      const source = pose(col);
+      const split = leg[col];
+      sprites[name] = [source, ...Array.from({length: WALK_FRAMES}, (_, i) =>
+        walkPose(source, i / WALK_FRAMES, split, col === 0, col === 1 && atlasIndex < 2))];
+    }
     spriteCache.set(key, sprites);
     return sprites;
   };
