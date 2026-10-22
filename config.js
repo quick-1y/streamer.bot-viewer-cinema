@@ -39,14 +39,14 @@ window.CINEMA_CONFIG = {
     rug1: 'assets/art/rug-1.png',
     rug2: 'assets/art/rug-2.png'
   },
-  // Пять мест для своих постеров слева направо. Укажите путь к PNG/JPG/SVG.
+  // Комплектные постеры слева направо; можно заменить своими PNG/JPG/SVG.
   // null, отсутствующая настройка или ошибка загрузки = пустая стена.
   posters: {
-    poster1: null,
-    poster2: null,
-    poster3: null,
-    poster4: null,
-    poster5: null
+    poster1: 'assets/posters/world-of-warcraft.png',
+    poster2: 'assets/posters/ragnarok-online.png',
+    poster3: 'assets/posters/cyberpunk-2077.png',
+    poster4: 'assets/posters/factorio.png',
+    poster5: 'assets/posters/apex-legends.png'
   },
   initialEntrance: 'seated',  // ?initial=walk | seated  (how viewers present at page load appear)
 
