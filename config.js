@@ -50,6 +50,11 @@ window.CINEMA_CONFIG = {
   },
   initialEntrance: 'seated',  // ?initial=walk | seated  (how viewers present at page load appear)
 
+  // Сообщения Twitch над персонажами (на всех страницах).
+  showChatBubbles: true,    // ?bubbles=0 выключает облачка
+  chatBubbleSeconds: 5,     // ?bubbleSeconds= сколько секунд показывать сообщение
+  chatBubbleMaxChars: 48,   // ?bubbleChars= предел длины; дальше троеточие
+
   rememberAudience: true,   // ?remember=0 disables local audience persistence
 
   // ---- Содержимое экрана: starting.html, break.html, ending.html ----

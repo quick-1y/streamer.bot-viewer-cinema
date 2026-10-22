@@ -160,6 +160,7 @@ const server = http.createServer((req, res) => {
     const type = u.searchParams.get('type') || 'ChatMessage';
     for (const c of clients) if ((c.subs.Twitch || []).includes(type)) {
       send(c, { event: { source: 'Twitch', type }, data: { message: {
+        username: u.searchParams.get('login') || u.searchParams.get('name') || 'alice',
         displayName: u.searchParams.get('name') || 'Alice', message: u.searchParams.get('text') || 'Hello'
       } } });
     }

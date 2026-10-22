@@ -176,11 +176,62 @@ def main():
               s.update(.1); const waiting=s.phase==='thanks'; s.update(.11);
               return waiting && s.phase==='intro';
             }'''))
+            ctl('/set?viewers=alice,bob,charlie,dana,erin')
+            open_scene('index', bubbleSeconds=1, bubbleChars=24, grace=0)
+            page.wait_for_function("__cinema.snapshot().seats.length===5")
+            ctl('/chat?' + urllib.parse.urlencode({'login': 'ALICE', 'name': 'Другое имя', 'text': 'Очень длинное сообщение в чат ' * 10}))
+            bubble = page.locator('.speech-bubble[data-viewer="alice"]')
+            bubble.wait_for(state='visible')
+            check('chat bubble matches login, not display name', bubble.count() == 1)
+            check('long bubble is compact and ends with ellipsis', bubble.inner_text().endswith('…') and len(bubble.inner_text()) <= 24)
+            check('bubble sits above character label inside viewport', page.evaluate("""() => {
+                const b=document.querySelector('.speech-bubble').getBoundingClientRect(), a=__cinema.audience.actors.get('alice');
+                return b.width<=164 && b.height<45 && b.left>=0 && b.right<=innerWidth && b.top>=0 && b.bottom<a._label.y;
+            }"""))
+            shots = Path(os.environ.get('SHOTS', '/tmp/cinema-scenes'))
+            shots.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(shots / 'bubble.png'))
+            ctl('/chat?' + urllib.parse.urlencode({'login': 'alice', 'text': 'Новое!'}))
+            page.wait_for_function("document.querySelector('.speech-bubble span').textContent==='Новое!'")
+            check('new message replaces previous bubble', page.locator('.speech-bubble').count() == 1)
+            page.wait_for_function("document.querySelectorAll('.speech-bubble').length===0")
+            check('bubble expires without new events', page.locator('.speech-bubble').count() == 0)
+            ctl('/chat?' + urllib.parse.urlencode({'login': 'outsider', 'name': 'alice', 'text': 'Нет кресла'}))
+            page.wait_for_timeout(100)
+            check('unknown chatter gets no bubble and no character', page.locator('.speech-bubble').count() == 0 and page.evaluate('__cinema.audience.actors.size') == 5)
+            family = '👨‍👩‍👧‍👦'
+            ctl('/chat?' + urllib.parse.urlencode({'login': 'bob', 'text': family * 30}))
+            page.wait_for_selector('.speech-bubble[data-viewer="bob"]')
+            check('truncation preserves emoji graphemes', page.locator('.speech-bubble span').inner_text() == family * 23 + '…')
+            ctl('/chat?' + urllib.parse.urlencode({'login': 'bob', 'text': '<img src=x onerror=x>'}))
+            page.wait_for_function("document.querySelector('.speech-bubble span').textContent.startsWith('<img')")
+            check('bubble treats chat as plain text', page.locator('.speech-bubble img').count() == 0)
+            ctl('/chat?type=ChatMessageDeleted')
+            page.wait_for_function("document.querySelectorAll('.speech-bubble').length===0")
+            check('moderation removes chat bubbles', page.locator('.speech-bubble').count() == 0)
+            for login in ['alice','bob','charlie','dana','erin']:
+                ctl('/chat?' + urllib.parse.urlencode({'login': login, 'text': 'Привет'}))
+            page.wait_for_function('__cinema.renderer.bubbles.size===4')
+            check('busy chat keeps at most four latest bubbles', page.locator('.speech-bubble').count() == 4 and page.locator('.speech-bubble[data-viewer="alice"]').count() == 0)
+            ctl('/set?viewers=alice,bob,charlie,dana')
+            ctl('/event')
+            page.wait_for_function("__cinema.audience.actors.get('erin').isLeaving() && !__cinema.renderer.bubbles.has('erin')")
+            check('leaving character immediately loses its bubble', page.locator('.speech-bubble[data-viewer="erin"]').count() == 0)
+            open_scene('break', bubbles=0)
+            ctl('/chat?' + urllib.parse.urlencode({'login':'alice','text':'Чат без облачков'}))
+            page.wait_for_function("document.querySelector('.chat-messages').textContent.includes('Чат без облачков')")
+            check('disabling bubbles preserves break chat', page.locator('.speech-bubble').count() == 0)
+            open_scene('index', bubbles=0)
+            check('disabled bubbles need no ChatMessage subscription on index', page.evaluate("!__cinema.connection.subscriptions.Twitch.includes('ChatMessage')"))
+            ctl('/set?viewers=')
             # Older scrolling credits resolves section/key names case-insensitively.
             variants = [
                 ('case-insensitive section and event keys', {'Users': {'Users': ['Зритель']}, 'Events': {'reSubs': ['Продление'], 'giftSubs': ['Подарок']}}, [['Зритель'], ['Продление'], ['Подарок']]),
                 ('enabled subscribers category from old headers', {'users': {'subscribers': ['Саб'], 'editors': ['Редактор']}}, [['Саб'], ['Редактор']]),
                 ('enabled Hype Train and top categories', {'hypeTrain': {'conductors': ['Проводник']}, 'top': {'monthBits': ['Топ']}}, [['Проводник'], ['Топ']]),
+                ('channel points top displays supplied leaderboard rows', {'top': {'channelRewards': ['Alice — 1200', 'Bob — 900']}}, [['Alice — 1200', 'Bob — 900']]),
+                ('unexpanded top templates do not create a permanent section', {'top': {'channelRewards': [' %user% — %points% ', '%topChannelRewards%']}}, []),
+                ('mixed templates and real entries retain only real rows', {'top': {'channelRewards': ['%userName%', ' Alice — 1200 ', 'alice — 1200']}}, [['Alice — 1200']]),
                 ('events without enabled Users category', {'events': {'follows': ['Фолловер']}}, [['Фолловер']]),
                 ('wrapped Credits response', {'credits': {'EVENTS': {'FOLLOWS': ['Обёртка']}}}, [['Обёртка']]),
             ]

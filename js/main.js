@@ -25,6 +25,9 @@
     if (q.has('debug')) base.debug = bool(q.get('debug'));
     if (q.has('remember')) base.rememberAudience = bool(q.get('remember'));
     if (q.has('demo')) base.demo = bool(q.get('demo'));
+    if (q.has('bubbles')) base.showChatBubbles = bool(q.get('bubbles'));
+    if (q.has('bubbleSeconds')) base.chatBubbleSeconds = num(q.get('bubbleSeconds'), base.chatBubbleSeconds);
+    if (q.has('bubbleChars')) base.chatBubbleMaxChars = num(q.get('bubbleChars'), base.chatBubbleMaxChars);
     base.port = base.port || 8080;
     base.host = base.host || '127.0.0.1';
     let ep = base.endpoint || '/';
@@ -56,6 +59,9 @@
     const audience = new VC.Audience({ seats, leaveGraceMs: Math.max(0, cfg.leaveGraceSeconds) * 1000 });
     const renderer = new VC.Renderer(document.getElementById('stage'), {
       showCounter: cfg.showCounter !== false,
+      showChatBubbles: cfg.showChatBubbles !== false,
+      chatBubbleSeconds: cfg.chatBubbleSeconds,
+      chatBubbleMaxChars: cfg.chatBubbleMaxChars,
       signText: cfg.signText ?? 'CINEMA',
       posters: cfg.posters,
       counterLabel: cfg.counterLabel || 'Зрители'
@@ -88,6 +94,21 @@
         hideBroadcaster: cfg.hideBroadcaster
       }, onList);
       sync.start();
+      if (cfg.showChatBubbles !== false) {
+        connection.subscriptions.Twitch.push('ChatMessage', 'ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut');
+        connection.on('event', event => {
+          if (event.source !== 'Twitch') return;
+          if (event.type === 'ChatMessage') {
+            const message = event.data.message;
+            if (!message || typeof message.username !== 'string') return;
+            const key = message.username.trim().toLowerCase();
+            const actor = audience.actors.get(key);
+            if (actor && actor.isInside() && !actor.isLeaving()) renderer.showBubble(key, message.message);
+          } else if (['ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut'].includes(event.type)) {
+            renderer.clearBubbles();
+          }
+        });
+      }
       if (screenScene) screenScene.connect(connection);
       connection.start();
     }
@@ -117,6 +138,7 @@
     });
     window.addEventListener('pagehide', () => {
       session.save();
+      renderer.clearBubbles();
       clearInterval(saveTimer);
       cancelAnimationFrame(raf);
       if (sync) sync.stop();

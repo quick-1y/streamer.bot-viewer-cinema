@@ -22,6 +22,11 @@
     if (!Array.isArray(data)) return [];
     const seen = new Set();
     return data.map(v => typeof v === 'string' ? v : v && (v.display || v.displayName || v.userName || v.name || v.login))
+      .filter(v => typeof v === 'string')
+      .map(v => v.trim())
+      // Credits formatting may leave unexpanded Streamer.bot arguments behind.
+      // Match the old scrolling credits: a template is not a viewer/leaderboard row.
+      .filter(v => !/%[^%\s]+%/u.test(v))
       .filter(v => {
         if (typeof v !== 'string' || !v.trim() || seen.has(v.trim().toLowerCase())) return false;
         seen.add(v.trim().toLowerCase()); return true;
@@ -113,7 +118,7 @@
     }
     connect(connection) {
       if (this.mode === 'break' && this.chatMode === 'streamerbot') {
-        connection.subscriptions.Twitch.push('ChatMessage', 'ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut');
+        connection.subscriptions.Twitch = Array.from(new Set([...connection.subscriptions.Twitch, 'ChatMessage', 'ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut']));
         connection.on('ready', () => this.chatNotice('Чат подключён. Ждём сообщений…'));
         connection.on('state', s => { if (s === 'waiting') this.chatNotice('Соединение потеряно. Переподключаемся…'); });
         connection.on('event', event => {

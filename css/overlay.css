@@ -120,3 +120,22 @@ html, body {
 .credits-group { margin-bottom: 65px; }
 .credits-group h2 { font-size: 44px; font-weight: 600; color: #ffd184; margin: 0 0 20px; overflow-wrap: anywhere; }
 .credits-name { font-size: 36px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* Transient, bounded chat messages above the full-resolution name labels. */
+.speech-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.speech-bubble {
+  position: absolute; box-sizing: border-box; padding: 6px 9px;
+  border: 1px solid #766750; border-radius: 9px;
+  background: #211d25; color: #fff7e8;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  font-weight: 500; line-height: 1.25;
+  box-shadow: 0 2px 6px #0008;
+}
+.speech-bubble[hidden] { display: none; }
+.speech-bubble span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.speech-bubble::after {
+  content: ''; position: absolute; left: var(--tail-left, 50%); bottom: -5px;
+  width: 8px; height: 8px; background: #211d25;
+  border-right: 1px solid #766750; border-bottom: 1px solid #766750;
+  transform: translateX(-50%) rotate(45deg);
+}
