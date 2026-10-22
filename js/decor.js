@@ -38,7 +38,8 @@
     c.height = h;
     return c;
   }
-  D.posters = function (config = {}) {
+  D.posters = function (config = {}, themeName) {
+    const palette = VC.CinemaThemes.get(themeName).poster;
     const slots = D.slots.filter(({ id }) => config && config[id] !== null && replacements.has(id));
     return slots.map(({ id, corners }) => {
       const [a, b, d] = corners;
@@ -60,11 +61,11 @@
       const height = 240 * (d[1] - a[1]) / (b[0] - a[0]);
       ctx.transform((b[0] - a[0]) / 240, (b[1] - a[1]) / 240,
         (d[0] - a[0]) / height, (d[1] - a[1]) / height, ...a);
-      ctx.fillStyle = '#241812'; ctx.fillRect(0, 0, 240, height);
-      ctx.fillStyle = '#b98643'; ctx.fillRect(4, 4, 232, height - 8);
-      ctx.strokeStyle = '#f1cc79'; ctx.lineWidth = 2;
+      ctx.fillStyle = palette.base; ctx.fillRect(0, 0, 240, height);
+      ctx.fillStyle = palette.frame; ctx.fillRect(4, 4, 232, height - 8);
+      ctx.strokeStyle = palette.edge; ctx.lineWidth = 2;
       ctx.strokeRect(6, 6, 228, height - 12);
-      ctx.fillStyle = '#482919'; ctx.fillRect(12, 12, 216, height - 24);
+      ctx.fillStyle = palette.inset; ctx.fillRect(12, 12, 216, height - 24);
       // Crop centrally to fill the frame without distorting the image.
       const iw = 204, ih = height * 316 / 360;
       const scale = Math.max(iw / replacement.width, ih / replacement.height);
@@ -76,7 +77,8 @@
     });
   };
 
-  D.sign = function (value) {
+  D.sign = function (value, themeName) {
+    const theme = VC.CinemaThemes.get(themeName);
     const text = String(value ?? 'CINEMA').replace(/\s+/gu, ' ').trim();
     const image = canvas(640, 160), ctx = image.getContext('2d');
     ctx.font = '700 120px "Inter", "Segoe UI", Arial, sans-serif';
@@ -90,8 +92,8 @@
     const scale = Math.min(592 / width, 128 / height);
     ctx.translate(image.width / 2, image.height / 2);
     ctx.scale(scale, scale);
-    ctx.fillStyle = '#ffe7a4';
-    ctx.shadowColor = '#ffad48';
+    ctx.fillStyle = theme.sign;
+    ctx.shadowColor = theme.signGlow;
     ctx.shadowBlur = 4;
     ctx.fillText(text, (left - right) / 2, (ascent - descent) / 2);
     return { text, image, scale, width: width * scale, height: height * scale };

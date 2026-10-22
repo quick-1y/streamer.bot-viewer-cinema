@@ -140,6 +140,29 @@ html, body {
   transform: translateX(-50%) rotate(45deg);
 }
 
+/* The scene layout and text sizes are shared by both visual presets. */
+[data-cinema-theme="cyberpunk"] .counter {
+  color: #d9faff;
+  background: linear-gradient(#15172d, #090f20);
+  border-color: #39dfed;
+  box-shadow: 0 0 0 calc(3px * var(--u)) #112b41,
+    inset 0 0 0 calc(2px * var(--u)) #38214c,
+    0 0 calc(18px * var(--u)) #23cbe533;
+}
+[data-cinema-theme="cyberpunk"] .counter .value { color: #b8faff; }
+[data-cinema-theme="cyberpunk"] .counter.bump .value { animation-name: neon-bump; }
+@keyframes neon-bump {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.22); color: #ff92dc; }
+}
+[data-cinema-theme="cyberpunk"] .speech-bubble {
+  background: #101a2a; color: #effcff; border-color: #47b6cb;
+  box-shadow: 0 2px 8px #020817cc;
+}
+[data-cinema-theme="cyberpunk"] .speech-bubble::after {
+  background: #101a2a; border-color: #47b6cb;
+}
+
 .startup-error {
   display: grid; place-items: center; box-sizing: border-box; padding: 32px;
   color: #f5f5f5; background: #191519;

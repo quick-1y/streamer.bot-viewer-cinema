@@ -29,6 +29,21 @@
   )
     .catch((error) => { A.error = error; });
 
+  const themeLoads = new Map();
+  A.configureTheme = function (name) {
+    const theme = VC.CinemaThemes.get(name);
+    if (!themeLoads.has(theme.id)) {
+      themeLoads.set(theme.id, Promise.all(Object.entries(theme.assets).map(([key, src]) =>
+        new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => { A.images[key] = image; resolve(); };
+          image.onerror = () => reject(new Error('Cannot load theme artwork: ' + src));
+          image.src = src;
+        }))));
+    }
+    return themeLoads.get(theme.id);
+  };
+
   // Atlas coordinates for each of the twelve characters.
   const viewerCrops = [
     {
@@ -56,12 +71,13 @@
     return c;
   }
   // Rectangular, top-down textures; each is projected onto its own floor rectangle.
-  let rugImages = [];
-  A.configureRugs = async function (config = {}) {
-    rugImages = await Promise.all(['rug1', 'rug2'].map(async id => {
+  const configuredRugs = new Map();
+  A.configureRugs = async function (config = {}, themeName) {
+    const theme = VC.CinemaThemes.get(themeName);
+    const images = await Promise.all(['rug1', 'rug2'].map(async (id, index) => {
       const src = config && config[id];
       if (src === null) return null;
-      const fallback = A.images[id];
+      const fallback = A.images[theme.rugs[index]];
       if (typeof src !== 'string' || !src.trim() || src === sources[id]) return fallback;
       const image = new Image();
       try {
@@ -76,25 +92,34 @@
         return fallback;
       }
     }));
+    configuredRugs.set(theme.id, images);
   };
   // The deterministic mesh is baked into this bundled layer. No pixel readback
   // or filesystem fetch is needed when OBS opens the overlay as a local file.
-  A.room = function () {
+  A.room = function (themeName) {
+    const theme = VC.CinemaThemes.get(themeName);
     const room=canvas(1672,941);
-    room.getContext('2d').drawImage(A.images.alignedRoom,0,0);
+    const ctx = room.getContext('2d');
+    ctx.filter = theme.roomFilter;
+    ctx.drawImage(A.images.alignedRoom,0,0);
+    ctx.filter = 'none';
+    if (theme.id === 'cyberpunk') {
+      // Material follows the existing projective floor. Insets keep it clear
+      // of the painted wall furniture, screen trim and entrance facade.
+      floorTexture(ctx, A.images.cyberFloor,
+        {x0: .7, x1: VC.Layout.W - .7, y0: .7, y1: VC.Layout.D - .3});
+      neonRoom(ctx);
+    }
     return room;
   };
-  A.rugs = function (ctx) {
-    ctx.save(); ctx.translate(24,12); ctx.scale(1872/1672,1054/941);
+  function floorTexture(ctx, image, rect) {
     // The floor map is projective, so each rug is sampled as a grid of small
     // affine cells: the texture stays undistorted and all four edges stay on
     // their world lines.
     const N=8;
-    for(const [index,rug] of VC.Layout.RUGS.entries()) {
-      const image = index in rugImages ? rugImages[index] : A.images['rug' + (index + 1)];
-      if (!image) continue;
+    if (image) {
       const source=(u,v)=>[u*image.naturalWidth,v*image.naturalHeight];
-      const target=(u,v)=>VC.Layout.floorArt(rug.x0+(rug.x1-rug.x0)*u,rug.y0+(rug.y1-rug.y0)*v);
+      const target=(u,v)=>VC.Layout.floorArt(rect.x0+(rect.x1-rect.x0)*u,rect.y0+(rect.y1-rect.y0)*v);
       for(let j=0;j<N;j++) for(let i=0;i<N;i++) {
         const cell=[[i,j],[i+1,j],[i+1,j+1],[i,j+1]].map(([u,v])=>[u/N,v/N]);
         const src=cell.map(c=>source(...c)), dst=cell.map(c=>target(...c));
@@ -103,15 +128,44 @@
           VC.drawTexturedTriangle(ctx,image,ids.map(k=>src[k]),ids.map(k=>dst[k]),1);
       }
     }
+  }
+  A.rugs = function (ctx, themeName) {
+    const theme = VC.CinemaThemes.get(themeName), images = configuredRugs.get(theme.id) || [];
+    ctx.save(); ctx.translate(24,12); ctx.scale(1872/1672,1054/941);
+    for (const [index, rug] of VC.Layout.RUGS.entries()) {
+      const image = index in images ? images[index] : A.images[theme.rugs[index]];
+      floorTexture(ctx, image, rug);
+    }
     ctx.restore();
   };
+
+  function neonRoom(ctx) {
+    const L = VC.Layout;
+    function strip(points, color, width = 2) {
+      ctx.save();
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      ctx.lineJoin = 'round'; ctx.shadowColor = color; ctx.shadowBlur = 10;
+      ctx.beginPath();
+      points.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
+      ctx.stroke(); ctx.restore();
+    }
+    const [back,right,,left] = L.FLOOR.corners;
+    // Parallel cornice lighting and the original four screen corners. These
+    // are decorative strokes; all projection and occlusion data stay shared.
+    strip([left,back,right].map(([x,y])=>[x,y-285]), '#3ce9fa', 3);
+    strip([...L.SCREEN_ART_CORNERS,L.SCREEN_ART_CORNERS[0]], '#ee4dbe', 2.5);
+    strip([[237,530],[357,588]], '#58f2ff', 2.5);
+    const rim = [[.4,.4],[L.W-.4,.4],[L.W-.4,L.D-.4],[.4,L.D-.4]]
+      .map(([x,y])=>L.floorArt(x,y));
+    strip([...rim,rim[0]], '#3ab6cc', 1.5);
+  }
   A.scene = function (opts = {}) {
-    const L = VC.Layout,
+    const theme = VC.CinemaThemes.get(opts.cinemaTheme), L = VC.Layout,
       bg = canvas(1920, 1080),
       fg = canvas(1920, 1080),
       lintel = canvas(1920, 1080),
-      room = A.room();
-    const sign = VC.Decor.sign(opts.signText);
+      room = A.room(theme.id);
+    const sign = VC.Decor.sign(opts.signText, theme.id);
     VC.Decor.drawSign(room.getContext('2d'), sign);
     const ctx = bg.getContext('2d'),
       front = fg.getContext('2d');
@@ -120,7 +174,7 @@
     ctx.filter = 'brightness(.9) saturate(.94)';
     // Preserve the original fine detail: no low-resolution intermediate canvas.
     ctx.drawImage(room, 24, 12, 1872, 1054);
-    A.rugs(ctx);
+    A.rugs(ctx, theme.id);
     const F = L.artPoint;
     function polygon(context, points) {
       points.forEach(([x, y], i) => {
@@ -149,7 +203,7 @@
     header.drawImage(room, 12, 6, 936, 527);
     front.save();
     front.scale(2, 2);
-    A.railings(front);
+    A.railings(front, theme.id);
     front.restore();
     // Painted lamp positions in the displayed room art.
     const lights = [
@@ -160,25 +214,26 @@
       [197, 548],
       [390, 647],
       [517, 317]
-    ].map(([x, y]) => ({
+    ].map(([x, y], index) => ({
       ...F(x, y),
       r: 14,
-      col: '255,172,74',
-      a: 0.035
+      col: theme.lights[index % theme.lights.length],
+      a: theme.id === 'cyberpunk' ? 0.065 : 0.035
     }));
     return {
       bg,
       room,
       fg,
       lintel,
-      posters: VC.Decor.posters(opts.posters),
+      posters: VC.Decor.posters(opts.posters, theme.id),
       sign,
-      seats: A.seats(),
+      seats: A.seats(theme.id),
       lights,
       screenGlow: F(1195, 470)
     };
   };
-  A.railings = function (ctx) {
+  A.railings = function (ctx, themeName) {
+    const colors = VC.CinemaThemes.get(themeName).rail;
     const L = VC.Layout,
       P = L.project;
     function shape(points, fill, stroke) {
@@ -220,8 +275,8 @@
           [x + s, y + s, h],
           [x - s, y + s, h]
         ],
-        '#56311e',
-        '#251922'
+        colors.front,
+        colors.frontEdge
       );
       shape(
         [
@@ -230,8 +285,8 @@
           [x + s, y + s, h],
           [x + s, y - s, h]
         ],
-        '#301c16',
-        '#211820'
+        colors.back,
+        colors.backEdge
       );
       shape(
         [
@@ -240,12 +295,12 @@
           [x + s, y + s, h],
           [x - s, y + s, h]
         ],
-        '#bd8240',
-        '#6e4a32'
+        colors.top,
+        colors.topEdge
       );
-      line([x - s, y + s, 0.08], [x - s, y + s, h - 0.06], '#8c4b24');
+      line([x - s, y + s, 0.08], [x - s, y + s, h - 0.06], colors.post);
       const p = P(x, y, h + 0.02);
-      ctx.fillStyle = '#ffe0a0';
+      ctx.fillStyle = colors.lamp;
       ctx.fillRect(p.x - 0.5, p.y - 0.6, 1, 1.2);
     }
     for (const [start, end, axis] of [
@@ -264,10 +319,10 @@
             [b[0] + normal[0], b[1] + normal[1], z],
             [a[0] + normal[0], a[1] + normal[1], z]
           ],
-          z === h ? '#79401e' : '#3a2117',
-          '#251a21'
+          z === h ? colors.upper : colors.lower,
+          colors.outline
         );
-        line([...a, z + 0.015], [...b, z + 0.015], z === h ? '#b56f33' : '#684021', 0.65);
+        line([...a, z + 0.015], [...b, z + 0.015], z === h ? colors.upperLight : colors.lowerLight, 0.65);
       }
       const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
       const sections = Math.ceil(length / 1.65);
@@ -275,12 +330,13 @@
         post(a[0] + ((b[0] - a[0]) * i) / sections, a[1] + ((b[1] - a[1]) * i) / sections);
     }
   };
-  A.seats = function () {
+  A.seats = function (themeName) {
     const back = canvas(100, 100),
       cushion = canvas(100, 100),
       ctx = back.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
+    ctx.filter = VC.CinemaThemes.get(themeName).chairFilter;
     ctx.drawImage(A.images.chair, 2, 3, 96, 87.75);
     const shadow = cushion.getContext('2d');
     shadow.save();

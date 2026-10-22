@@ -16,6 +16,7 @@
     constructor(root, opts) {
       this.root = root;
       this.opts = opts;
+      root.dataset.cinemaTheme = VC.CinemaThemes.get(opts.cinemaTheme).id;
       this.scene = VC.Art.scene(opts);
 
       this.world = document.createElement('canvas');
