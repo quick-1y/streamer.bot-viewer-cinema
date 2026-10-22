@@ -16,7 +16,7 @@
     constructor(root, opts) {
       this.root = root;
       this.opts = opts;
-      this.scene = VC.buildScene(opts);
+      this.scene = VC.Art.scene(opts);
 
       this.world = document.createElement('canvas');
       this.world.className = 'world';
@@ -153,7 +153,7 @@
         // pale bounce light from the blank screen onto stage and front rows
         const g = this.scene.screenGlow;
         const grd = ctx.createRadialGradient(g.x, g.y, 4, g.x, g.y, 150);
-        grd.addColorStop(0, this.scene.illustrated ? 'rgba(170,155,180,0.012)' : 'rgba(170,155,180,0.045)');
+        grd.addColorStop(0, 'rgba(170,155,180,0.012)');
         grd.addColorStop(1, 'rgba(170,155,180,0)');
         ctx.fillStyle = grd;
         ctx.fillRect(g.x - 150, g.y - 150, 300, 300);
@@ -172,10 +172,10 @@
     }
 
     drawActor(a) {
-      if (!a.sprites) a.sprites = VC.buildSprites(a.appearance);
+      if (!a.sprites) a.sprites = VC.Art.sprites(a.appearanceKey);
       const ctx = this.ctx;
       const sp = a.sprites;
-      const spriteScale = sp.scale || 1.25;
+      const spriteScale = sp.scale;
       const p = L.project(a.pos.x, a.pos.y, 0);
       let x = Math.round(p.x), y = Math.round(p.y);
       let img, flip = false, footY = sp.footY;
@@ -184,15 +184,14 @@
         img = sp.sit;
         footY = sp.sitFootY;
         const bob = (a.phase === 'seated' && (a.idleClock % a.idlePeriod) < 0.35) ? 1 : 0;
-        y = y - (sp.seatOffset ?? 14) + bob;
-        x += sp.seatShift || 0;          // align the seated pose with the taller upholstered chair
-        flip = !sp.generated;
+        y = y - sp.seatOffset + bob;
+        x += sp.seatShift;          // align the seated pose with the taller upholstered chair
       } else {
         const front = a.facing === 'SW' || a.facing === 'SE';
         const set = front ? sp.front : sp.back;
         const f = a.moving ? 1 + (Math.floor(a.walkClock * 3.2) % 4) : 0;
         img = set[f];
-        flip = a.facing === 'SE' || a.facing === (sp.generated ? 'NW' : 'NE');
+        flip = a.facing === 'SE' || a.facing === 'NW';
         y -= Math.round(a.sit * 4);
       }
       a.screenX = x; a.screenTop = y - footY * spriteScale + 1;
@@ -243,6 +242,7 @@
     }
 
     drawBubbles(audience) {
+      if (!this.bubbles.size) return;
       const now = Date.now(), placed = [];
       const width = this.labels.width / this.dpr, height = this.labels.height / this.dpr;
       for (const [key, bubble] of Array.from(this.bubbles).reverse()) {

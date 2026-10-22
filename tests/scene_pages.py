@@ -293,6 +293,15 @@ def main():
                   [...document.fonts].some(f=>f.family==='Inter' && f.status==='loaded');
             }"""))
 
+            check('sprite frames are shared by the 32 rendered variants', page.evaluate("""() => {
+                const frames=Array.from({length:64},(_,seed)=>VC.Art.sprites(seed));
+                return new Set(frames).size===32 && VC.Art.sprites(0)===VC.Art.sprites(8);
+            }"""))
+            page.route('**/assets/art/cinema-chair.png', lambda route: route.abort())
+            page.goto(f'http://127.0.0.1:{server.server_port}/index.html?demo=1')
+            page.wait_for_selector('#stage.startup-error')
+            check('missing required artwork reports an error instead of drawing a legacy room', 'Не удалось загрузить' in page.locator('#stage').inner_text() and page.locator('canvas.world').count()==0)
+            page.unroute('**/assets/art/cinema-chair.png')
             check('no browser errors', not errors)
             shots = Path(os.environ.get('SHOTS', '/tmp/cinema-scenes'))
             shots.mkdir(parents=True, exist_ok=True)

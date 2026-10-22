@@ -133,6 +133,5 @@
   };
 
   VC.ViewerSync = ViewerSync;
-  VC.normalizeViewerResponse = normalizeResponse;
   VC.normalizeViewerList = normalizeList;
 })();

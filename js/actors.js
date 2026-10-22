@@ -26,7 +26,7 @@
       this.key = viewer.key;
       this.viewer = viewer;
       this.seat = seat;
-      this.appearance = VC.makeAppearance(viewer.key);
+      this.appearanceKey = VC.Art.appearanceKey(viewer.key);
       this.sprites = null;          // built lazily by the renderer
       this.route = L.routeToSeat(seat);
       this.lens = [];

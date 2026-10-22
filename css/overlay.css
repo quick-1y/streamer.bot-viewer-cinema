@@ -139,3 +139,9 @@ html, body {
   border-right: 1px solid #766750; border-bottom: 1px solid #766750;
   transform: translateX(-50%) rotate(45deg);
 }
+
+.startup-error {
+  display: grid; place-items: center; box-sizing: border-box; padding: 32px;
+  color: #f5f5f5; background: #191519;
+  font: 500 24px/1.5 'Inter', 'Segoe UI', Arial, sans-serif; text-align: center;
+}

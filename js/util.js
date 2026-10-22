@@ -35,8 +35,6 @@
   };
 
   VC.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  VC.lerp = (a, b, t) => a + (b - a) * t;
-  VC.ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
   VC.uid = (() => { let n = 0; return (p = 'vc') => `${p}-${Date.now().toString(36)}-${(++n).toString(36)}`; })();
 

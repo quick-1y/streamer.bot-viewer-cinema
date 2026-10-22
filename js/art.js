@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const VC = window.VC;
-  const A = (VC.Art = { images: {}, ready: null, available: false });
+  const A = (VC.Art = { images: {}, ready: null, error: null });
   const sources = {
     alignedRoom: 'assets/art/cinema-room-aligned.png',
     rug1: 'assets/art/rug-1.png',
@@ -25,12 +25,7 @@
         })
     )
   )
-    .then(() => {
-      A.available = true;
-    })
-    .catch((error) => {
-      console.warn(error.message);
-    });
+    .catch((error) => { A.error = error; });
 
   const crops = [
     [
@@ -132,7 +127,7 @@
         const src=cell.map(c=>source(...c)), dst=cell.map(c=>target(...c));
         // One artwork pixel of overlap keeps solid custom textures opaque at seams.
         for(const ids of [[0,1,2],[0,2,3]])
-          VC.RoomWarp.triangle(ctx,image,ids.map(k=>src[k]),ids.map(k=>dst[k]),1);
+          VC.drawTexturedTriangle(ctx,image,ids.map(k=>src[k]),ids.map(k=>dst[k]),1);
       }
     }
     ctx.restore();
@@ -207,8 +202,7 @@
       sign,
       seats: A.seats(),
       lights,
-      screenGlow: F(1195, 470),
-      illustrated: true
+      screenGlow: F(1195, 470)
     };
   };
   A.railings = function (ctx) {
@@ -377,8 +371,74 @@
     ctx.restore();
   }
 
-  A.sprites = function (appearance) {
-    const hash = VC.hash(appearance.hair + appearance.shirt + appearance.hairStyle);
+  // Preserve existing viewers' atlas selections while storing only the style seed.
+  const HAIR = [
+    '#1d1515',
+    '#2e1f17',
+    '#4a2c1a',
+    '#6b3f22',
+    '#a0592b',
+    '#c98a3c',
+    '#e6c36a',
+    '#d9d4cc',
+    '#8a8f99',
+    '#c2493f',
+    '#e07aa8',
+    '#7a4fc9',
+    '#3f7fd6',
+    '#3aa489',
+    '#1f2a48',
+    '#f2f0ea'
+  ];
+  const SHIRT = [
+    '#c0392b',
+    '#e67e22',
+    '#f1c40f',
+    '#27ae60',
+    '#16a085',
+    '#2980b9',
+    '#3b5bdb',
+    '#8e44ad',
+    '#d35486',
+    '#ecf0f1',
+    '#34495e',
+    '#7f8c8d',
+    '#6d4c41',
+    '#00a8a8',
+    '#b33771',
+    '#f78fb3',
+    '#546de5',
+    '#2d3436'
+  ];
+  const HAIRSTYLES = [
+    'short',
+    'short',
+    'spiky',
+    'long',
+    'bob',
+    'ponytail',
+    'bun',
+    'curly',
+    'mohawk',
+    'buzz',
+    'side',
+    'long'
+  ];
+  A.appearanceKey = function (login) {
+    const random = VC.rng(VC.hash(login));
+    const shirt = SHIRT[Math.floor(random() * SHIRT.length)];
+    random(); // Reserved draw: keeps previously assigned characters stable.
+    const style = HAIRSTYLES[Math.floor(random() * HAIRSTYLES.length)];
+    random();
+    const hair = HAIR[Math.floor(random() * HAIR.length)];
+    return VC.hash(hair + shirt + style);
+  };
+
+  // Only 32 atlas/row/palette combinations exist; share their immutable frames.
+  const spriteCache = new Map();
+  A.sprites = function (hash) {
+    const key = hash & 0x37;
+    if (spriteCache.has(key)) return spriteCache.get(key);
     const row = hash % 4,
       atlasCrops = (hash >>> 2) % 2 ? extraCrops : crops,
       atlas = (hash >>> 2) % 2 ? A.images.viewersExtra : A.images.viewers,
@@ -410,7 +470,7 @@
       }
       return c;
     }
-    return {
+    const sprites = {
       front: [0, 1, 2, 3, 4].map((f) => pose(0, f)),
       back: [0, 1, 2, 3, 4].map((f) => pose(1, f)),
       sit: pose(2),
@@ -420,8 +480,9 @@
       sitFootY: 62,
       scale: 1,
       seatOffset: 16,
-      seatShift: 8,
-      generated: true
+      seatShift: 8
     };
+    spriteCache.set(key, sprites);
+    return sprites;
   };
 })();
