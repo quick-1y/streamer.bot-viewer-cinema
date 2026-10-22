@@ -293,6 +293,54 @@ def main():
                   [...document.fonts].some(f=>f.family==='Inter' && f.status==='loaded');
             }"""))
 
+            check('sprite frames are shared by the 48 rendered variants', page.evaluate("""() => {
+                const frames=Array.from({length:192},(_,seed)=>VC.Art.sprites(seed));
+                return new Set(frames).size===48 && VC.Art.sprites(0)===VC.Art.sprites(8);
+            }"""))
+            check('all outfits have twelve distinct unclipped walking frames in both directions', page.evaluate("""() => {
+                const variants = new Set(Array.from({length:192},(_,seed)=>VC.Art.sprites(seed)));
+                return [...variants].every(sp => ['front','back'].every(view => {
+                    const frames=sp[view];
+                    return frames.length===13 && new Set(frames.slice(1).map(c=>c.toDataURL())).size===12 &&
+                      frames.every(c=>{
+                        const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+                        for(let x=0;x<c.width;x++) {
+                          if(pixels[x*4+3]>16 || pixels[((c.height-1)*c.width+x)*4+3]>16) return false;
+                        }
+                        return true;
+                      });
+                }));
+            }"""))
+            check('older rear poses use rear artwork rather than transplanted front legs', page.evaluate("""() => {
+                if(!VC.Art.images.viewersBack.complete) return false;
+                return Array.from({length:8},(_,seed)=>VC.Art.sprites(seed)).every(sp=>{
+                    const mirrored=document.createElement('canvas');mirrored.width=80;mirrored.height=128;
+                    const ctx=mirrored.getContext('2d');ctx.translate(80,0);ctx.scale(-1,1);ctx.drawImage(sp.front[0],0,0);
+                    const front=ctx.getImageData(0,94,80,34).data;
+                    const back=sp.back[0].getContext('2d').getImageData(0,94,80,34).data;
+                    let different=0;for(let i=0;i<back.length;i++)if(front[i]!==back[i])different++;
+                    return different>500;
+                });
+            }"""))
+            check('walking phase follows actual distance, stops when blocked and advances on exit', page.evaluate("""() => {
+                const a=new VC.Actor({key:'walk-test'}, VC.Layout.buildSeats(60)[30]);
+                a.s=a.seatStart-0.01;
+                a.advance(1, [], 1);
+                if(Math.abs(a.walkClock-0.01)>1e-8) return false;
+                a.advance(1, [], 1);
+                if(a.moving || Math.abs(a.walkClock-0.01)>1e-8) return false;
+                a.advance(0.1, [], -1);
+                if(!a.moving || Math.abs(a.walkClock-0.25)>1e-8) return false;
+                a.s=0;
+                a.blocked=()=>true;
+                a.advance(0.1, [], 1);
+                return Math.abs(a.walkClock-0.25)<1e-8;
+            }"""))
+            page.route('**/assets/art/cinema-chair.png', lambda route: route.abort())
+            page.goto(f'http://127.0.0.1:{server.server_port}/index.html?demo=1')
+            page.wait_for_selector('#stage.startup-error')
+            check('missing required artwork reports an error instead of drawing a legacy room', 'Не удалось загрузить' in page.locator('#stage').inner_text() and page.locator('canvas.world').count()==0)
+            page.unroute('**/assets/art/cinema-chair.png')
             check('no browser errors', not errors)
             shots = Path(os.environ.get('SHOTS', '/tmp/cinema-scenes'))
             shots.mkdir(parents=True, exist_ok=True)

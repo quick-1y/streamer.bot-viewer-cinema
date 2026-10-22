@@ -13,19 +13,9 @@
     VIEW_W: 960,
     VIEW_H: 540,
     ART_SCALE: 2, // artwork is composited at native 1920×1080 resolution
-    TW: 40,
-    TH: 20,
     ZS: 25.8, // tile width/height in px, px per z unit
-    OX: 496.96,
-    OY: 155.52, // screen position of world origin
     W: 19.8,
     D: 17.4,
-    H: 5.8, // room size (x, y) and wall height
-    STAGE_D: 2.1, // raised stage depth in front of the screen
-    SCREEN_X0: 2.15,
-    SCREEN_X1: 17.65,
-    SCREEN_Z0: 1.25,
-    SCREEN_Z1: 5.15,
     CENTER_AISLE: 9.9,
     // Walking line in the centre aisle. A chair on the camera side (+x) of a walker
     // is in front of them and hides them from the feet up; its sprite reaches ~2.3
@@ -36,9 +26,6 @@
     // Behind the last row, but clear of the low entrance partition: walking at the
     // old 16.2 the painted wall cut off the walkers' legs ("sinking into the floor").
     CROSS_Y: 15.5,
-    DOOR_X0: 1.2,
-    DOOR_X1: 3.5,
-    DOOR_H: 3.0,
     ROWS: [4.1, 6.1, 8.1, 10.7, 12.7, 14.7],
     // A 4-tile centre aisle (2.6 tiles between chair edges) lets a walker pass
     // the blocks without the neighbouring chair backs being drawn over them.
@@ -241,7 +228,7 @@
   /** Higher is better: middle rows, seats toward the centre of the screen. */
   L.seatDesirability = function (s) {
     const rowScore = [0.4, 0.85, 1.0, 1.0, 0.85, 0.6][s.row] || 0.5;
-    const centreX = (L.SCREEN_X0 + L.SCREEN_X1) / 2;
+    const centreX = L.CENTER_AISLE;
     const xScore = 1 - Math.abs(s.x - centreX) / 8;
     return rowScore * 1.4 + xScore;
   };
@@ -250,8 +237,6 @@
   /** Polyline from outside the door to the seat (last point = seat itself). */
   L.routeToSeat = function (seat) {
     const walk = L.seatPoint(seat.row, seat.nominalX, L.WALK_OFFSET);
-    const next = L.seatPoint(seat.row, seat.nominalX + 1, L.WALK_OFFSET);
-    const rowSlope = (next.y - walk.y) / (next.x - walk.x);
     const half = (L.BLOCKS[seat.block].n - 1) / 2;
     // No aisle along the left wall: there the chairs would stand on the walkers'
     // camera side, and the entrance facade cuts off their legs near the back.
@@ -259,7 +244,7 @@
     const aisle = seat.block === 1 && seat.index > half ? L.RIGHT_AISLE : L.CENTER_LANE;
     const pts = [L.OUTSIDE, L.INSIDE, { x: L.INSIDE.x, y: L.CROSS_Y }];
     if (Math.abs(aisle - L.INSIDE.x) > 1e-6) pts.push({ x: aisle, y: L.CROSS_Y });
-    pts.push({ x: aisle, y: walk.y + (aisle - walk.x) * rowSlope }, walk, { x: seat.x, y: seat.y });
+    pts.push({ x: aisle, y: walk.y }, walk, { x: seat.x, y: seat.y });
     return pts.map((p) => ({ x: p.x, y: p.y }));
   };
 

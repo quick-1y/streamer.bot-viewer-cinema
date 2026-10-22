@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 MOCK = ROOT / 'tests' / 'mock-streamerbot.js'
-PAGE = (ROOT / 'index.html').as_uri()
+PAGE = os.environ.get('TEST_PAGE_URL', (ROOT / 'index.html').as_uri())
 SHOTS = Path(os.environ.get('SHOTS', ROOT / 'tests' / 'screenshots'))
 SHOTS.mkdir(parents=True, exist_ok=True)
 
@@ -97,7 +97,8 @@ def names(prefix, n, start=0):
 
 def main():
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        options = {'executable_path': os.environ['CHROMIUM_EXECUTABLE']} if os.environ.get('CHROMIUM_EXECUTABLE') else {}
+        browser = p.chromium.launch(**options)
 
         # ---------------------------------------------------------------- crypto parity
         pg = browser.new_page()
@@ -130,13 +131,13 @@ def main():
                 ctx.fillRect(0,0,c.width,c.height);sources['poster'+i]=c.toDataURL();
             }
             await VC.Decor.ready(sources);
-            const before = VC.buildScene({posters:sources});
+            const before = VC.Art.scene({posters:sources});
             const replacement = document.createElement('canvas');
             replacement.width = replacement.height = 16;
             const ctx = replacement.getContext('2d');
             ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, 16, 16);
             await VC.Decor.ready({...sources,poster3: replacement.toDataURL()});
-            const after = VC.buildScene({posters: {...sources,poster2: null}, signText: 'Мой канал'});
+            const after = VC.Art.scene({posters: {...sources,poster2: null}, signText: 'Мой канал'});
             const pixels = s => Array.from(s.image.getContext('2d')
                 .getImageData(0, 0, s.image.width, s.image.height).data);
             const oldGood = pixels(before.posters.find(p => p.id === 'poster3'));
@@ -149,9 +150,9 @@ def main():
             // must now contain red wall, even when no poster object is drawn.
             const wall = b.getImageData(450, 390, 1, 1).data;
             await VC.Decor.ready({poster3:'data:image/png;base64,bm90LWFuLWltYWdl'});
-            const invalid=VC.buildScene().posters.length===0;
+            const invalid=VC.Art.scene().posters.length===0;
             await VC.Decor.ready({});
-            const empty=VC.buildScene().posters.length===0;
+            const empty=VC.Art.scene().posters.length===0;
             return {ids: after.posters.map(p => p.id), untouched, invalid, empty,
                 distinct:before.posters.length===5&&new Set(before.posters.map(p=>p.image)).size===5,
                 replaced: JSON.stringify(oldGood) !== JSON.stringify(newGood),
@@ -485,7 +486,7 @@ def main():
             scales.append(pg.evaluate('__cinema.renderer.scale'))
         check('14h. OBS resolutions use exact 1x, 2x and 4x pixel scales', scales == [1,2,4], str(scales))
         check('14i. illustrated assets loaded and render at native 1080p', pg.evaluate(
-            "VC.Art.available && __cinema.renderer.scene.illustrated && __cinema.renderer.world.width === 1920 && __cinema.renderer.world.height === 1080"))
+            "Object.keys(VC.Art.images).length === 8 && __cinema.renderer.world.width === 1920 && __cinema.renderer.world.height === 1080"))
         geometry = pg.evaluate("""() => {
             const seats=VC.Layout.buildSeats(60), c=VC.Layout.FLOOR.corners;
             const edge=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
@@ -557,7 +558,7 @@ def main():
             const guides=[{name:'screen-wall-base',target:[[960,350.9],[1380,589.1]]},
                 {name:'front-floor-edge',target:[[560,727.6],[890,913.8]]}];
             const c=VC.Layout.FLOOR.corners, edge=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
-            return {original:measure({canvas:original,guides:VC.RoomMesh.guides,target:false}),
+            return {original:measure({canvas:original,guides:""" + (ROOT / "tests/fixtures/wall-guides.json").read_text() + """,target:false}),
                 corrected:measure({canvas:__cinema.renderer.scene.room,guides,
                     specs:[{name:'screen-wall-base',sign:1},{name:'front-floor-edge',sign:-1}]}),
                 floor:{'screen-wall-base':edge(c[0],c[1]),'front-floor-edge':edge(c[3],c[2])}};

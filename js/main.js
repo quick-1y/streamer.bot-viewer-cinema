@@ -44,6 +44,7 @@
 
   async function start() {
     await VC.Art.ready;
+    if (VC.Art.error) throw VC.Art.error;
     const cfg = readConfig();
     // Measure signs, viewer labels and fitted screen text with the bundled font.
     if (document.fonts && document.fonts.load) {
@@ -138,9 +139,6 @@
       raf = requestAnimationFrame(frame);
     };
     const begin = () => { last = performance.now(); raf = requestAnimationFrame(frame); };
-    if (document.fonts && document.fonts.load) {
-      document.fonts.load(renderer.font).catch(() => {}).finally(() => { renderer.widthCache.clear(); });
-    }
     begin();
 
     let saveTimer = setInterval(() => session.save(), 1000);
@@ -184,6 +182,14 @@
     };
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
+  function launch() {
+    start().catch(error => {
+      console.error('Cinema startup failed:', error);
+      const stage = document.getElementById('stage');
+      stage.classList.add('startup-error');
+      stage.textContent = 'Не удалось загрузить кинотеатр. Проверьте файлы оверлея и обновите источник в OBS.';
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', launch);
+  else launch();
 })();

@@ -42,7 +42,6 @@
       if (this.mode === 'starting') this.message(this.q.get('text') ?? str(cfg.startingText, 'Стрим скоро начнется'));
       if (this.mode === 'break') this.buildChat();
       if (this.mode === 'ending') {
-        this.el.classList.add('is-credits');
         this.message(this.q.get('text') ?? str(cfg.endingText, 'Стрим завершен'));
         if (cfg.demo) this.acceptCredits({ users: { users: ['Котейка', 'Aurora', 'NightRain'] },
           events: { follows: ['Новый_зритель'], subs: ['Sakura'], cheers: ['Pixel'] } });

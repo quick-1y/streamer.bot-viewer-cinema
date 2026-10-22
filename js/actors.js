@@ -11,7 +11,7 @@
   const VC = window.VC;
   const L = VC.Layout;
 
-  const WALK_SPEED = 3.0;    // tiles / second; keeps traversal bounded in the larger hall
+  const WALK_SPEED = 2.4;    // tiles / second; a relaxed walk through the hall
   const SIT_TIME = 0.5;      // seconds to sit down (sliding back into the chair) / stand up
   const TURN_TIME = 0.3;     // turn round in the row, back to the chair, before sitting
   const RISE_PAUSE = 0.18;   // stand with the back to the chair for a moment before walking off
@@ -26,7 +26,7 @@
       this.key = viewer.key;
       this.viewer = viewer;
       this.seat = seat;
-      this.appearance = VC.makeAppearance(viewer.key);
+      this.appearanceKey = VC.Art.appearanceKey(viewer.key);
       this.sprites = null;          // built lazily by the renderer
       this.route = L.routeToSeat(seat);
       this.lens = [];
@@ -193,9 +193,11 @@
         return;
       }
       this.blockedFor = Math.max(0, this.blockedFor - dt * 2);
+      const previous = this.s;
       this.s = VC.clamp(this.s + WALK_SPEED * dt * sign, 0, this.seatStart);
-      this.moving = true;
-      this.walkClock += dt * WALK_SPEED;
+      const distance = Math.abs(this.s - previous);
+      this.moving = distance > 0;
+      this.walkClock += distance;
       this.basePos = this.sample(this.s);
     }
 
