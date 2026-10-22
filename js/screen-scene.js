@@ -124,7 +124,7 @@
         connection.on('event', event => {
           if (event.source !== 'Twitch') return;
           if (event.type === 'ChatMessage') {
-            const m = event.data.message; if (m) this.addChat(m.displayName || m.username, m.message);
+            const m = VC.normalizeChatMessage(event.data); if (m) this.addChat(m.display, m.text);
           } else if (['ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut'].includes(event.type)) {
             this.chat.replaceChildren(); this.chatNotice('Чат подключён. Ждём сообщений…');
           }

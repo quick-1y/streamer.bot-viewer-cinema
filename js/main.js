@@ -79,6 +79,9 @@
       session.save();
     };
 
+    const bubbleStats = { received: 0, invalid: 0, ignored: 0, matched: 0, waiting: 0 };
+    const ignoredChat = new Set((cfg.ignore || []).map(v => String(v).toLowerCase()));
+    let lastChatRefresh = 0;
     let connection = null, sync = null, demo = null;
     if (cfg.demo) {
       demo = VC.startDemo((list) => onList(VC.normalizeViewerList(list, listOpts)));
@@ -99,11 +102,22 @@
         connection.on('event', event => {
           if (event.source !== 'Twitch') return;
           if (event.type === 'ChatMessage') {
-            const message = event.data.message;
-            if (!message || typeof message.username !== 'string') return;
-            const key = message.username.trim().toLowerCase();
+            bubbleStats.received++;
+            const message = VC.normalizeChatMessage(event.data);
+            if (!message) { bubbleStats.invalid++; VC.log.debug('Bubble skipped: unrecognized chat payload'); return; }
+            const key = message.login;
             const actor = audience.actors.get(key);
-            if (actor && actor.isInside() && !actor.isLeaving()) renderer.showBubble(key, message.message);
+            if (ignoredChat.has(key) || (cfg.hideBroadcaster && message.isBroadcaster) || (actor && actor.isLeaving())) {
+              bubbleStats.ignored++; return;
+            }
+            if (actor && actor.isInside()) bubbleStats.matched++;
+            else bubbleStats.waiting++;
+            renderer.showBubble(key, message.text);
+            // Keep a recent message while the authoritative presence list catches up.
+            if (!actor && Date.now() - lastChatRefresh >= 1000) {
+              lastChatRefresh = Date.now(); sync.refreshSoon('chat author');
+            }
+            VC.log.debug('Chat bubbles:', Object.assign({}, bubbleStats));
           } else if (['ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut'].includes(event.type)) {
             renderer.clearBubbles();
           }
@@ -158,6 +172,14 @@
     // Read-only handle for automated tests / console inspection (nothing is rendered).
     window.__cinema = {
       config: cfg, audience, connection, renderer, screenScene,
+      chatDiagnostics: () => Object.assign({}, bubbleStats, {
+        enabled: cfg.showChatBubbles !== false, demo: !!cfg.demo,
+        connection: connection ? connection.state : 'demo',
+        subscribed: connection ? connection.subscriptionAccepted : null,
+        shown: renderer.bubblesShown,
+        visible: renderer.bubbleLayer.querySelectorAll('.speech-bubble:not([hidden])').length,
+        pending: renderer.bubbles.size
+      }),
       snapshot: () => Object.assign(audience.snapshot(), { connection: connection ? connection.state : 'demo' })
     };
   }

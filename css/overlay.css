@@ -122,7 +122,7 @@ html, body {
 .credits-name { font-size: 36px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
 
 /* Transient, bounded chat messages above the full-resolution name labels. */
-.speech-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.speech-bubbles { z-index: 2; position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .speech-bubble {
   position: absolute; box-sizing: border-box; padding: 6px 9px;
   border: 1px solid #766750; border-radius: 9px;

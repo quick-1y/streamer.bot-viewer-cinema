@@ -158,11 +158,14 @@ const server = http.createServer((req, res) => {
   }
   if (u.pathname === '/chat') {
     const type = u.searchParams.get('type') || 'ChatMessage';
+    const login = u.searchParams.get('login') || u.searchParams.get('name') || 'alice';
+    const displayName = u.searchParams.get('name') || 'Alice', text = u.searchParams.get('text') || 'Hello';
+    let data = { message: { username: login, displayName, message: text } };
+    if (u.searchParams.get('format') === 'alias') data = { message: { userName: login, displayName, message: text } };
+    if (u.searchParams.get('format') === 'flat') data = { userName: login, displayName, message: text };
+    if (u.searchParams.get('format') === 'user') data = { message: { user: { login }, displayName, text } };
     for (const c of clients) if ((c.subs.Twitch || []).includes(type)) {
-      send(c, { event: { source: 'Twitch', type }, data: { message: {
-        username: u.searchParams.get('login') || u.searchParams.get('name') || 'alice',
-        displayName: u.searchParams.get('name') || 'Alice', message: u.searchParams.get('text') || 'Hello'
-      } } });
+      send(c, { event: { source: 'Twitch', type }, data });
     }
     return ok({ sent: true });
   }

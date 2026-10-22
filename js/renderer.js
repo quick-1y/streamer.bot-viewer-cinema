@@ -34,6 +34,7 @@
       root.appendChild(this.labels);
 
       this.bubbles = new Map();
+      this.bubblesShown = 0;
       this.bubbleLayer = document.createElement('div');
       this.bubbleLayer.className = 'speech-bubbles';
       root.appendChild(this.bubbleLayer);
@@ -225,22 +226,19 @@
       const seconds = Number(this.opts.chatBubbleSeconds);
       const duration = Number.isFinite(seconds) ? VC.clamp(seconds, .5, 30) : 5;
       const previous = this.bubbles.get(key);
-      if (previous) previous.el.remove();
+      const el = previous ? previous.el : null;
+      if (el) el.firstChild.textContent = text;
       this.bubbles.delete(key);
-      const el = document.createElement('div'); el.className = 'speech-bubble';
-      el.dataset.viewer = key;
-      const span = document.createElement('span'); span.textContent = text; el.appendChild(span);
-      this.bubbleLayer.appendChild(el);
-      this.bubbles.set(key, { el, expires: Date.now() + duration * 1000 });
+      this.bubbles.set(key, { el, text, expires: Date.now() + duration * 1000 });
       // Keep busy chats compact: one latest message per actor, four bubbles total.
       while (this.bubbles.size > 4) {
         const oldest = this.bubbles.keys().next().value;
-        this.bubbles.get(oldest).el.remove(); this.bubbles.delete(oldest);
+        const el = this.bubbles.get(oldest).el; if (el) el.remove(); this.bubbles.delete(oldest);
       }
     }
 
     clearBubbles() {
-      for (const bubble of this.bubbles.values()) bubble.el.remove();
+      for (const bubble of this.bubbles.values()) if (bubble.el) bubble.el.remove();
       this.bubbles.clear();
     }
 
@@ -248,11 +246,20 @@
       const now = Date.now(), placed = [];
       const width = this.labels.width / this.dpr, height = this.labels.height / this.dpr;
       for (const [key, bubble] of Array.from(this.bubbles).reverse()) {
-        const actor = audience.actors.get(key), el = bubble.el;
-        if (now >= bubble.expires || !actor || !actor.isInside() || actor.isLeaving()) {
-          el.remove(); this.bubbles.delete(key); continue;
+        const actor = audience.actors.get(key);
+        if (now >= bubble.expires || (actor && actor.isLeaving())) {
+          if (bubble.el) bubble.el.remove(); this.bubbles.delete(key); continue;
         }
-        if (actor.labelVisible === false || actor.alpha <= 0 || !actor._label) { el.hidden = true; continue; }
+        if (!actor || !actor.isInside() || actor.labelVisible === false || actor.alpha <= 0 || !actor._label) {
+          if (bubble.el) bubble.el.hidden = true; continue;
+        }
+        if (!bubble.el) {
+          const el = document.createElement('div'); el.className = 'speech-bubble';
+          el.dataset.viewer = key;
+          const span = document.createElement('span'); span.textContent = bubble.text; el.appendChild(span);
+          this.bubbleLayer.appendChild(el); bubble.el = el; this.bubblesShown++;
+        }
+        const el = bubble.el;
         el.hidden = false;
         el.style.fontSize = VC.clamp(this.scale * 7, 12, 22) + 'px';
         el.style.maxWidth = Math.min(width - 16, VC.clamp(this.scale * 82, 120, 220)) + 'px';
