@@ -17,8 +17,6 @@
     if (q.has('grace')) base.leaveGraceSeconds = num(q.get('grace'), base.leaveGraceSeconds);
     if (q.has('hideBroadcaster')) base.hideBroadcaster = bool(q.get('hideBroadcaster'));
     if (q.has('ignore')) base.ignore = q.get('ignore').split(',').map((s) => s.trim()).filter(Boolean);
-    if (q.has('theme')) base.cinemaTheme = q.get('theme');
-    base.cinemaTheme = VC.CinemaThemes.get(base.cinemaTheme).id;
     if (q.has('bg')) base.background = q.get('bg');
     if (q.has('seats')) base.maxSeats = num(q.get('seats'), base.maxSeats);
     if (q.has('counter')) base.showCounter = bool(q.get('counter'));
@@ -53,8 +51,8 @@
       await Promise.all([400, 500, 600, 700].map(weight =>
         document.fonts.load(`${weight} 48px "Inter"`))).catch(() => {});
     }
-    await Promise.all([VC.Decor.ready(cfg.posters), VC.Art.configureTheme(cfg.cinemaTheme)]);
-    await VC.Art.configureRugs(cfg.rugs, cfg.cinemaTheme);
+    await VC.Decor.ready(cfg.posters);
+    await VC.Art.configureRugs(cfg.rugs);
     VC.log.enabled = !!cfg.debug;
     applyBackground(cfg.background);
 
@@ -65,7 +63,6 @@
       showChatBubbles: cfg.showChatBubbles !== false,
       chatBubbleSeconds: cfg.chatBubbleSeconds,
       chatBubbleMaxChars: cfg.chatBubbleMaxChars,
-      cinemaTheme: cfg.cinemaTheme,
       signText: cfg.signText ?? 'CINEMA',
       posters: cfg.posters,
       counterLabel: cfg.counterLabel || 'Зрители'

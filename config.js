@@ -28,7 +28,6 @@ window.CINEMA_CONFIG = {
   ],
 
   // ---- Look ----
-  cinemaTheme: 'classic',   // ?theme=classic | cyberpunk
   background: 'dark',       // ?bg=dark | transparent | #rrggbb
   maxSeats: 60,             // ?seats= cap (layout has 60 seats)
   showCounter: true,        // ?counter=0 hides "Зрители"
