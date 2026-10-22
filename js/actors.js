@@ -11,7 +11,7 @@
   const VC = window.VC;
   const L = VC.Layout;
 
-  const WALK_SPEED = 3.0;    // tiles / second; keeps traversal bounded in the larger hall
+  const WALK_SPEED = 2.4;    // tiles / second; a relaxed walk through the hall
   const SIT_TIME = 0.5;      // seconds to sit down (sliding back into the chair) / stand up
   const TURN_TIME = 0.3;     // turn round in the row, back to the chair, before sitting
   const RISE_PAUSE = 0.18;   // stand with the back to the chair for a moment before walking off

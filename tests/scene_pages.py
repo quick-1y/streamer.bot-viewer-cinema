@@ -297,11 +297,11 @@ def main():
                 const frames=Array.from({length:192},(_,seed)=>VC.Art.sprites(seed));
                 return new Set(frames).size===48 && VC.Art.sprites(0)===VC.Art.sprites(8);
             }"""))
-            check('all outfits have eight distinct unclipped walking frames in both directions', page.evaluate("""() => {
+            check('all outfits have twelve distinct unclipped walking frames in both directions', page.evaluate("""() => {
                 const variants = new Set(Array.from({length:192},(_,seed)=>VC.Art.sprites(seed)));
                 return [...variants].every(sp => ['front','back'].every(view => {
                     const frames=sp[view];
-                    return frames.length===9 && new Set(frames.slice(1).map(c=>c.toDataURL())).size===8 &&
+                    return frames.length===13 && new Set(frames.slice(1).map(c=>c.toDataURL())).size===12 &&
                       frames.every(c=>{
                         const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
                         for(let x=0;x<c.width;x++) {
@@ -310,34 +310,6 @@ def main():
                         return true;
                       });
                 }));
-            }"""))
-            check('thin texture triangles join without transparent seams', page.evaluate("""() => {
-                const image=document.createElement('canvas'); image.width=80;image.height=128;
-                const source=image.getContext('2d');source.fillStyle='#345678';source.fillRect(0,0,80,128);
-                const result=document.createElement('canvas');result.width=80;result.height=128;
-                const ctx=result.getContext('2d');
-                // The old centroid expansion left visible lines on these narrow cells.
-                for(let y=10;y<110;y+=4){
-                    const points=[[10,y],[70,y],[70,y+4],[10,y+4]];
-                    for(const indices of [[0,1,2],[0,2,3]]){
-                        const triangle=indices.map(i=>points[i]);
-                        VC.drawTexturedTriangle(ctx,image,triangle,triangle,.65);
-                    }
-                }
-                const pixels=ctx.getImageData(12,12,56,96).data;
-                for(let i=3;i<pixels.length;i+=4)if(pixels[i]<250)return false;
-                return true;
-            }"""))
-            check('expanded mesh clips cannot sample distant pixels outside their source cell', page.evaluate("""() => {
-                const image=document.createElement('canvas');image.width=64;image.height=64;
-                const paint=image.getContext('2d');paint.fillStyle='#00ff00';paint.fillRect(0,0,64,64);paint.clearRect(16,16,16,16);
-                function pixels(bounds){
-                    const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
-                    VC.drawTexturedTriangle(canvas.getContext('2d'),image,
-                      [[20,20],[24,20],[24,24]],[[10,10],[14,10],[14,10.1]],.55,bounds);
-                    return canvas.getContext('2d').getImageData(0,0,64,64).data.some((v,i)=>i%4===3&&v>0);
-                }
-                return pixels(null) && !pixels([20,20,4,4]);
             }"""))
             check('older rear poses use rear artwork rather than transplanted front legs', page.evaluate("""() => {
                 if(!VC.Art.images.viewersBack.complete) return false;
@@ -358,11 +330,11 @@ def main():
                 a.advance(1, [], 1);
                 if(a.moving || Math.abs(a.walkClock-0.01)>1e-8) return false;
                 a.advance(0.1, [], -1);
-                if(!a.moving || Math.abs(a.walkClock-0.31)>1e-8) return false;
+                if(!a.moving || Math.abs(a.walkClock-0.25)>1e-8) return false;
                 a.s=0;
                 a.blocked=()=>true;
                 a.advance(0.1, [], 1);
-                return Math.abs(a.walkClock-0.31)<1e-8;
+                return Math.abs(a.walkClock-0.25)<1e-8;
             }"""))
             page.route('**/assets/art/cinema-chair.png', lambda route: route.abort())
             page.goto(f'http://127.0.0.1:{server.server_port}/index.html?demo=1')
