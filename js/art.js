@@ -29,65 +29,26 @@
   )
     .catch((error) => { A.error = error; });
 
-  const crops = [
-    [
-      [172, 26, 147, 342],
-      [455, 30, 161, 338],
-      [758, 82, 207, 270]
-    ],
-    [
-      [168, 375, 163, 352],
-      [452, 379, 158, 348],
-      [750, 434, 215, 270]
-    ],
-    [
-      [171, 730, 156, 349],
-      [448, 731, 169, 347],
-      [766, 790, 205, 263]
-    ],
-    [
-      [172, 1079, 159, 348],
-      [447, 1079, 159, 343],
-      [742, 1134, 235, 264]
-    ]
+  // Atlas coordinates for each of the twelve characters.
+  const viewerCrops = [
+    {
+      front: [[172, 26, 147, 342], [168, 375, 163, 352], [171, 730, 156, 349], [172, 1079, 159, 348]],
+      back: [[229, 20, 162, 374], [212, 402, 176, 360], [228, 766, 166, 367], [217, 1138, 178, 368]],
+      sit: [[758, 82, 207, 270], [750, 434, 215, 270], [766, 790, 205, 263], [742, 1134, 235, 264]]
+    },
+    {
+      front: [[156, 21, 163, 361], [152, 386, 181, 361], [154, 747, 172, 359], [157, 1106, 168, 339]],
+      back: [[646, 25, 166, 371], [631, 403, 177, 360], [646, 772, 171, 358], [645, 1144, 175, 366]],
+      sit: [[762, 77, 224, 286], [749, 441, 245, 284], [770, 814, 224, 270], [770, 1159, 228, 270]]
+    },
+    {
+      front: [[142, 27, 149, 361], [134, 398, 161, 363], [135, 766, 158, 366], [128, 1134, 165, 373]],
+      back: [[440, 31, 150, 354], [431, 397, 164, 362], [438, 768, 157, 359], [435, 1133, 168, 371]],
+      sit: [[746, 84, 224, 276], [752, 451, 236, 281], [768, 820, 221, 287], [757, 1184, 244, 292]]
+    }
   ];
-  const extraCrops = [
-    [
-      [156, 21, 163, 361],
-      [453, 17, 169, 364],
-      [762, 77, 224, 286]
-    ],
-    [
-      [152, 386, 181, 361],
-      [444, 386, 178, 361],
-      [749, 441, 245, 284]
-    ],
-    [
-      [154, 747, 172, 359],
-      [450, 747, 177, 359],
-      [770, 814, 224, 270]
-    ],
-    [
-      [157, 1106, 168, 339],
-      [451, 1106, 171, 338],
-      [770, 1159, 228, 270]
-    ]
-  ];
-  const diverseCrops = [
-    [[142, 27, 149, 361], [440, 31, 150, 354], [746, 84, 224, 276]],
-    [[134, 398, 161, 363], [431, 397, 164, 362], [752, 451, 236, 281]],
-    [[135, 766, 158, 366], [438, 768, 157, 359], [768, 820, 221, 287]],
-    [[128, 1134, 165, 373], [435, 1133, 168, 371], [757, 1184, 244, 292]]
-  ];
-  // Neutral rear poses for the older sheets, whose original backs are mid-stride.
-  const backCrops = [
-    [[229, 20, 162, 374], [212, 402, 176, 360], [228, 766, 166, 367], [217, 1138, 178, 368]],
-    [[646, 25, 166, 371], [631, 403, 177, 360], [646, 772, 171, 358], [645, 1144, 175, 366]]
-  ];
-  // Front/rear leg boundaries measured offline: OBS file:// forbids pixel reads.
-  const legs = [[41, 40], [40, 40], [40, 40], [40, 40]];
-  const extraLegs = [[43, 40], [41, 40], [43, 40], [42, 40]];
-  const diverseLegs = [[40, 40], [40, 40], [40, 40], [40, 40]];
+  // Front leg splits measured offline; all rear poses share the same split.
+  const frontLegSplits = [[41, 40, 40, 40], [43, 41, 43, 42], [40, 40, 40, 40]];
   function canvas(w, h) {
     const c = document.createElement('canvas');
     c.width = w;
@@ -352,7 +313,6 @@
     });
   }
   // Small rigid leg swings preserve the painted contours and shoe proportions.
-  // There is no knee slicing, texture mesh, stretching or inverse kinematics.
   function walkPose(source, phase, split, front, textures) {
     const c = canvas(80, SPRITE_HEIGHT), ctx = c.getContext('2d');
     const direction = front ? 1 : -1;
@@ -450,15 +410,14 @@
     const key = atlasIndex * 16 + (hash & 3) * 4 + ((hash >>> 4) & 3);
     if (spriteCache.has(key)) return spriteCache.get(key);
     const row = hash % 4,
-      atlasCrops = [crops, extraCrops, diverseCrops][atlasIndex],
+      atlasCrops = viewerCrops[atlasIndex],
       atlas = [A.images.viewers, A.images.viewersExtra, A.images.viewersDiverse][atlasIndex],
-      leg = [legs, extraLegs, diverseLegs][atlasIndex][row],
-      scale = 116 / atlasCrops[row][0][3];
-    function pose(col) {
+      scale = 116 / atlasCrops.front[row][3];
+    function pose(name) {
       const c = canvas(80, SPRITE_HEIGHT),
         ctx = c.getContext('2d');
-      const rear = col === 1 && atlasIndex < 2;
-      const [x, y, w, h] = rear ? backCrops[atlasIndex][row] : atlasCrops[row][col];
+      const rear = name === 'back' && atlasIndex < 2;
+      const [x, y, w, h] = atlasCrops[name][row];
       const poseScale = rear ? 116 / h : scale;
       const dw = w * poseScale, dh = h * poseScale;
       ctx.imageSmoothingEnabled = true;
@@ -483,7 +442,7 @@
       front: [],
       back: [],
       strideDistance: 1.2,
-      sit: pose(2),
+      sit: pose('sit'),
       w: 40,
       h: SPRITE_HEIGHT / 2,
       footY: 62,
@@ -492,12 +451,12 @@
       seatOffset: 16,
       seatShift: 8
     };
-    for (const [name, col] of [['front', 0], ['back', 1]]) {
-      const source = pose(col);
-      const split = leg[col];
-      const cells = legTextures(source, split);
+    for (const name of ['front', 'back']) {
+      const source = pose(name);
+      const split = name === 'front' ? frontLegSplits[atlasIndex][row] : 40;
+      const textures = legTextures(source, split);
       sprites[name] = [source, ...Array.from({length: WALK_FRAMES}, (_, i) =>
-        walkPose(source, i / WALK_FRAMES, split, col === 0, cells))];
+        walkPose(source, i / WALK_FRAMES, split, name === 'front', textures))];
     }
     spriteCache.set(key, sprites);
     return sprites;

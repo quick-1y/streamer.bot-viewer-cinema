@@ -121,7 +121,7 @@ def main():
                 distinct: new Set(scene.posters.map(p => p.image)).size,
                 sign: scene.sign.text, configuredSign: window.CINEMA_CONFIG.signText ?? 'CINEMA'};
         }''')
-        check('decor. default room has no posters or frames', decor['ids'] == [] and decor['distinct'] == 0)
+        check('decor. five bundled posters load in the default room', decor['ids'] == ['poster1','poster2','poster3','poster4','poster5'] and decor['distinct'] == 5)
         check('decor. marquee uses configured text', decor['sign'] == decor['configuredSign'])
         custom = pg.evaluate('''async () => {
             const sources = {};

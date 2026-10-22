@@ -56,7 +56,7 @@
       ctx.closePath();
       ctx.clip();
       const replacement = replacements.get(id);
-      // Frames are generated only for successfully loaded user images.
+      // Frames are generated only for successfully loaded images.
       const height = 240 * (d[1] - a[1]) / (b[0] - a[0]);
       ctx.transform((b[0] - a[0]) / 240, (b[1] - a[1]) / 240,
         (d[0] - a[0]) / height, (d[1] - a[1]) / height, ...a);

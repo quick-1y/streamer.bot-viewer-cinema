@@ -71,15 +71,16 @@
 
 ### Постеры и ковры
 
-Положите свои изображения в `assets/posters/` и назначьте места в `config.js`:
+По умолчанию установлены постеры пяти игр. Их можно заменить своими изображениями
+из `assets/posters/`, изменив пути в `config.js`:
 
 ```js
 posters: {
-  poster1: 'assets/posters/ally-flag.png',
-  poster2: null,
-  poster3: null,
-  poster4: null,
-  poster5: null
+  poster1: 'assets/posters/world-of-warcraft.png',
+  poster2: 'assets/posters/ragnarok-online.png',
+  poster3: 'assets/posters/cyberpunk-2077.png',
+  poster4: 'assets/posters/factorio.png',
+  poster5: 'assets/posters/apex-legends.png'
 },
 ```
 
