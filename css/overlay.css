@@ -1,7 +1,8 @@
 @font-face {
-  font-family: 'Pixelify Sans';
-  src: url('../fonts/PixelifySans.ttf') format('truetype');
-  font-weight: 400 700;
+  font-family: 'Inter';
+  src: url('../fonts/Inter.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
   font-display: block;
 }
 
@@ -45,7 +46,7 @@ html, body {
   align-items: center;
   gap: calc(12px * var(--u));
   padding: calc(9px * var(--u)) calc(22px * var(--u)) calc(9px * var(--u)) calc(14px * var(--u));
-  font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
   font-weight: 600;
   color: #ffe9c4;
   background: linear-gradient(#241925, #18121d);
@@ -87,4 +88,54 @@ html, body {
   0% { transform: scale(1); }
   35% { transform: scale(1.22); color: #ffd36b; }
   100% { transform: scale(1); }
+}
+
+/* Screen plane calibrated to the painted interior, clipped before projection. */
+.cinema-screen {
+  position: absolute; left: 0; top: 0; width: 1000px; height: 400px;
+  transform-origin: 0 0; overflow: hidden; contain: layout paint;
+  color: #f5f5f5; background: #191519;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif; font-weight: 500;
+  font-optical-sizing: auto; pointer-events: none;
+}
+.screen-message { position: absolute; inset: 28px 40px; display: flex; align-items: center; justify-content: center; text-align: center; }
+.screen-message span { display: block; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.15; font-weight: 600; min-width: 0; max-width: 100%; }
+.screen-chat { box-sizing: border-box; height: 100%; padding: 18px 28px; }
+.screen-chat h1 { margin: 0 0 12px; font-size: 38px; overflow-wrap: anywhere; }
+.chat-messages { height: 310px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 9px; }
+.chat-line { flex: 0 0 auto; font-size: 29px; line-height: 1.15; overflow-wrap: anywhere; white-space: pre-wrap; }
+.chat-line strong { color: #ffd184; }
+.chat-empty { font-size: 30px; opacity: .7; }
+/* Widget viewport is 500×200, projected to the screen's 1000×400 plane.
+ * This keeps the exported chat's 20px font readable at a 1920×1080 OBS size.
+ * Transparent widgets normally use light text, so give them a dark backing.
+ */
+.screen-chat.is-embed { padding: 0; background: #191519; }
+.screen-chat iframe {
+  display: block; width: 50%; height: 50%; border: 0; background: transparent;
+  transform: scale(2); transform-origin: 0 0;
+}
+
+.credits-roll { position: absolute; left: 45px; right: 45px; top: 0; text-align: center; will-change: transform; }
+.credits-group { margin-bottom: 65px; }
+.credits-group h2 { font-size: 44px; font-weight: 600; color: #ffd184; margin: 0 0 20px; overflow-wrap: anywhere; }
+.credits-name { font-size: 36px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* Transient, bounded chat messages above the full-resolution name labels. */
+.speech-bubbles { z-index: 2; position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.speech-bubble {
+  position: absolute; box-sizing: border-box; padding: 6px 9px;
+  border: 1px solid #766750; border-radius: 9px;
+  background: #211d25; color: #fff7e8;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  font-weight: 500; line-height: 1.25;
+  box-shadow: 0 2px 6px #0008;
+}
+.speech-bubble[hidden] { display: none; }
+.speech-bubble span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.speech-bubble::after {
+  content: ''; position: absolute; left: var(--tail-left, 50%); bottom: -5px;
+  width: 8px; height: 8px; background: #211d25;
+  border-right: 1px solid #766750; border-bottom: 1px solid #766750;
+  transform: translateX(-50%) rotate(45deg);
 }

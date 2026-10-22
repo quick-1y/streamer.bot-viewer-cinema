@@ -120,6 +120,18 @@
     }
   }
 
+  // Accept the nested Twitch payload and flat/alias fields used by chat bridges.
+  // Never use displayName as identity: it need not match the login.
+  VC.normalizeChatMessage = function (data) {
+    if (!data || typeof data !== 'object') return null;
+    const message = data.message && typeof data.message === 'object' ? data.message : data;
+    const user = message.user || data.user || {};
+    const login = message.username || message.userName || message.login || user.login || user.userName;
+    const content = typeof message.message === 'string' ? message.message : message.text;
+    if (typeof login !== 'string' || !login.trim() || typeof content !== 'string' || !content.trim()) return null;
+    return { login: login.trim().toLowerCase(), display: message.displayName || message.display || login, text: content, isBroadcaster: message.role === 4 || String(message.role).toLowerCase() === 'broadcaster' };
+  };
+
   VC.ViewerSync = ViewerSync;
   VC.normalizeViewerResponse = normalizeResponse;
   VC.normalizeViewerList = normalizeList;

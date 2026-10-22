@@ -39,6 +39,7 @@
       this.timeoutsInRow = 0;
       this.info = null;
       this.authenticated = false;
+      this.subscriptionAccepted = null;
     }
 
     on(type, fn) { this.listeners[type].add(fn); return () => this.listeners[type].delete(fn); }
@@ -192,12 +193,14 @@
       this.attempt = 0;
       this.timeoutsInRow = 0;
       this.setState('ready');
+      this.subscriptionAccepted = null;
       const events = this.subscriptions;
       if (events && Object.keys(events).length) {
         try {
           const res = await this.request({ request: 'Subscribe', events });
-          if (!res || res.status !== 'ok') log.warn('Subscribe was not accepted', res && res.error);
-        } catch (e) { log.warn('Subscribe failed', e.message); }
+          this.subscriptionAccepted = !!res && res.status === 'ok';
+          if (!this.subscriptionAccepted) log.warn('Subscribe was not accepted', res && res.error);
+        } catch (e) { this.subscriptionAccepted = false; log.warn('Subscribe failed', e.message); }
       }
       if (this.state === 'ready') this.emit('ready', this.info);
     }

@@ -79,7 +79,7 @@
   D.sign = function (value) {
     const text = String(value ?? 'CINEMA').replace(/\s+/gu, ' ').trim();
     const image = canvas(640, 160), ctx = image.getContext('2d');
-    ctx.font = '700 120px "Pixelify Sans", "Trebuchet MS", sans-serif';
+    ctx.font = '700 120px "Inter", "Segoe UI", Arial, sans-serif';
     const metrics = ctx.measureText(text);
     const left = metrics.actualBoundingBoxLeft || 0;
     const right = metrics.actualBoundingBoxRight || metrics.width;

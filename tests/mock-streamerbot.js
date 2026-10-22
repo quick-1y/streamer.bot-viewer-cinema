@@ -25,6 +25,8 @@ const PASSWORD = opt('password', '');
 const ENFORCE = !!opt('enforce', false);
 
 let viewers = [];
+let credits = { users: { users: [] }, events: {}, groups: {} };
+let creditsError = false;
 let malformedNext = false;
 let silent = false;
 const clients = new Set();
@@ -107,6 +109,8 @@ function onMessage(c, text) {
       for (const k of Object.keys(ev)) c.subs[k] = Array.from(new Set([...(c.subs[k] || []), ...ev[k]]));
       return reply({ status: 'ok', events: c.subs });
     }
+    case 'GetCredits':
+      return reply(creditsError ? { status: 'error', error: 'Credits unavailable' } : Object.assign({}, credits, { status: 'ok' }));
     case 'GetInfo':
       return reply({ status: 'ok', info: hello().info });
     case 'GetActiveViewers':
@@ -142,6 +146,29 @@ function broadcastPresent() {
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   const ok = (o) => { res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(o)); };
+  if (u.pathname === '/credits') {
+    if (req.method !== 'POST') { res.writeHead(405); return res.end(); }
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try { credits = JSON.parse(body); creditsError = u.searchParams.get('error') === '1'; ok({ saved: true }); }
+      catch (_) { res.writeHead(400); res.end(); }
+    });
+    return;
+  }
+  if (u.pathname === '/chat') {
+    const type = u.searchParams.get('type') || 'ChatMessage';
+    const login = u.searchParams.get('login') || u.searchParams.get('name') || 'alice';
+    const displayName = u.searchParams.get('name') || 'Alice', text = u.searchParams.get('text') || 'Hello';
+    let data = { message: { username: login, displayName, message: text } };
+    if (u.searchParams.get('format') === 'alias') data = { message: { userName: login, displayName, message: text } };
+    if (u.searchParams.get('format') === 'flat') data = { userName: login, displayName, message: text };
+    if (u.searchParams.get('format') === 'user') data = { message: { user: { login }, displayName, text } };
+    for (const c of clients) if ((c.subs.Twitch || []).includes(type)) {
+      send(c, { event: { source: 'Twitch', type }, data });
+    }
+    return ok({ sent: true });
+  }
   if (u.pathname === '/set') {
     viewers = (u.searchParams.get('viewers') || '').split(',').map((s) => s.trim()).filter(Boolean);
     return ok({ viewers: viewers.length });

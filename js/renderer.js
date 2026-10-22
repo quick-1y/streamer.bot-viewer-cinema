@@ -33,6 +33,12 @@
       root.appendChild(this.world);
       root.appendChild(this.labels);
 
+      this.bubbles = new Map();
+      this.bubblesShown = 0;
+      this.bubbleLayer = document.createElement('div');
+      this.bubbleLayer.className = 'speech-bubbles';
+      root.appendChild(this.bubbleLayer);
+
       this.counterEl = null;
       this.counterValue = -1;
       if (opts.showCounter) this.buildCounter();
@@ -45,6 +51,7 @@
 
     destroy() {
       window.removeEventListener('resize', this.onResize);
+      this.clearBubbles();
       this.root.innerHTML = '';
     }
 
@@ -95,7 +102,7 @@
       this.labels.height = Math.round(vh * dpr);
       Object.assign(this.labels.style, { width: vw + 'px', height: vh + 'px' });
       this.fontPx = VC.clamp(Math.round(scale * 9), 12, 34);
-      this.font = `600 ${this.fontPx}px "Pixelify Sans", "Trebuchet MS", sans-serif`;
+      this.font = `600 ${this.fontPx}px "Inter", "Segoe UI", Arial, sans-serif`;
       this.widthCache = new Map();
       if (this.counterEl) this.counterEl.style.setProperty('--u', (scale / (1920 / L.VIEW_W)).toFixed(3));
     }
@@ -134,6 +141,7 @@
       if (S.lintel) ctx.drawImage(S.lintel, 0, 0, L.VIEW_W, L.VIEW_H);
       this.drawLights(time, false);
       this.drawLabels(visible);
+      this.drawBubbles(audience);
       this.setCount(audience.hallCount);
     }
 
@@ -203,6 +211,74 @@
         ctx.drawImage(img, x - Math.floor(sp.w * spriteScale / 2), Math.round(y - footY * spriteScale), Math.round(sp.w * spriteScale), Math.round(sp.h * spriteScale));
       }
       ctx.globalAlpha = 1;
+    }
+
+    showBubble(key, message) {
+      if (!this.opts.showChatBubbles || typeof message !== 'string') return;
+      const clean = message.replace(/[\u0000-\u001f\u007f-\u009f\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!clean) return;
+      const configured = Number(this.opts.chatBubbleMaxChars);
+      const limit = Number.isFinite(configured) ? VC.clamp(Math.floor(configured), 8, 120) : 48;
+      const units = typeof Intl.Segmenter === 'function'
+        ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(clean), part => part.segment)
+        : Array.from(clean);
+      const text = units.length > limit ? units.slice(0, limit - 1).join('') + '…' : clean;
+      const seconds = Number(this.opts.chatBubbleSeconds);
+      const duration = Number.isFinite(seconds) ? VC.clamp(seconds, .5, 30) : 5;
+      const previous = this.bubbles.get(key);
+      const el = previous ? previous.el : null;
+      if (el) el.firstChild.textContent = text;
+      this.bubbles.delete(key);
+      this.bubbles.set(key, { el, text, expires: Date.now() + duration * 1000 });
+      // Keep busy chats compact: one latest message per actor, four bubbles total.
+      while (this.bubbles.size > 4) {
+        const oldest = this.bubbles.keys().next().value;
+        const el = this.bubbles.get(oldest).el; if (el) el.remove(); this.bubbles.delete(oldest);
+      }
+    }
+
+    clearBubbles() {
+      for (const bubble of this.bubbles.values()) if (bubble.el) bubble.el.remove();
+      this.bubbles.clear();
+    }
+
+    drawBubbles(audience) {
+      const now = Date.now(), placed = [];
+      const width = this.labels.width / this.dpr, height = this.labels.height / this.dpr;
+      for (const [key, bubble] of Array.from(this.bubbles).reverse()) {
+        const actor = audience.actors.get(key);
+        if (now >= bubble.expires || (actor && actor.isLeaving())) {
+          if (bubble.el) bubble.el.remove(); this.bubbles.delete(key); continue;
+        }
+        if (!actor || !actor.isInside() || actor.labelVisible === false || actor.alpha <= 0 || !actor._label) {
+          if (bubble.el) bubble.el.hidden = true; continue;
+        }
+        if (!bubble.el) {
+          const el = document.createElement('div'); el.className = 'speech-bubble';
+          el.dataset.viewer = key;
+          const span = document.createElement('span'); span.textContent = bubble.text; el.appendChild(span);
+          this.bubbleLayer.appendChild(el); bubble.el = el; this.bubblesShown++;
+        }
+        const el = bubble.el;
+        el.hidden = false;
+        el.style.fontSize = VC.clamp(this.scale * 7, 12, 22) + 'px';
+        el.style.maxWidth = Math.min(width - 16, VC.clamp(this.scale * 82, 120, 220)) + 'px';
+        const w = el.offsetWidth, h = el.offsetHeight;
+        const left = VC.clamp(actor._label.x - w / 2, 8, Math.max(8, width - w - 8));
+        let top = VC.clamp(actor._label.y - this.fontPx - h - 10, 8, Math.max(8, height - h - 8));
+        let collides = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          collides = placed.some(p => left < p.right + 4 && left + w + 4 > p.left && top < p.bottom + 4 && top + h + 4 > p.top);
+          if (!collides || top <= 8) break;
+          top = Math.max(8, top - h - 6);
+        }
+        collides = placed.some(p => left < p.right + 4 && left + w + 4 > p.left && top < p.bottom + 4 && top + h + 4 > p.top);
+        if (collides) { el.hidden = true; continue; }
+        el.style.left = left + 'px'; el.style.top = top + 'px';
+        el.style.setProperty('--tail-left', VC.clamp(actor._label.x - left, 12, Math.max(12, w - 12)) + 'px');
+        el.style.opacity = String(actor.alpha);
+        placed.push({ left, top, right: left + w, bottom: top + h });
+      }
     }
 
     // ------------------------------------------------------------------ labels

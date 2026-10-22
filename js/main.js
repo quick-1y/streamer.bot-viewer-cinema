@@ -25,6 +25,9 @@
     if (q.has('debug')) base.debug = bool(q.get('debug'));
     if (q.has('remember')) base.rememberAudience = bool(q.get('remember'));
     if (q.has('demo')) base.demo = bool(q.get('demo'));
+    if (q.has('bubbles')) base.showChatBubbles = bool(q.get('bubbles'));
+    if (q.has('bubbleSeconds')) base.chatBubbleSeconds = num(q.get('bubbleSeconds'), base.chatBubbleSeconds);
+    if (q.has('bubbleChars')) base.chatBubbleMaxChars = num(q.get('bubbleChars'), base.chatBubbleMaxChars);
     base.port = base.port || 8080;
     base.host = base.host || '127.0.0.1';
     let ep = base.endpoint || '/';
@@ -42,9 +45,10 @@
   async function start() {
     await VC.Art.ready;
     const cfg = readConfig();
-    // Cached decoration text must be measured with the actual bundled font.
+    // Measure signs, viewer labels and fitted screen text with the bundled font.
     if (document.fonts && document.fonts.load) {
-      await document.fonts.load('700 48px "Pixelify Sans"').catch(() => {});
+      await Promise.all([400, 500, 600, 700].map(weight =>
+        document.fonts.load(`${weight} 48px "Inter"`))).catch(() => {});
     }
     await VC.Decor.ready(cfg.posters);
     await VC.Art.configureRugs(cfg.rugs);
@@ -55,11 +59,15 @@
     const audience = new VC.Audience({ seats, leaveGraceMs: Math.max(0, cfg.leaveGraceSeconds) * 1000 });
     const renderer = new VC.Renderer(document.getElementById('stage'), {
       showCounter: cfg.showCounter !== false,
+      showChatBubbles: cfg.showChatBubbles !== false,
+      chatBubbleSeconds: cfg.chatBubbleSeconds,
+      chatBubbleMaxChars: cfg.chatBubbleMaxChars,
       signText: cfg.signText ?? 'CINEMA',
       posters: cfg.posters,
       counterLabel: cfg.counterLabel || 'Зрители'
     });
     renderer.setSeats(seats);
+    const screenScene = VC.ScreenScene ? new VC.ScreenScene(renderer, cfg) : null;
     const session = new VC.AudienceSession(cfg, audience);
     session.restore();
 
@@ -71,6 +79,9 @@
       session.save();
     };
 
+    const bubbleStats = { received: 0, invalid: 0, ignored: 0, matched: 0, waiting: 0 };
+    const ignoredChat = new Set((cfg.ignore || []).map(v => String(v).toLowerCase()));
+    let lastChatRefresh = 0;
     let connection = null, sync = null, demo = null;
     if (cfg.demo) {
       demo = VC.startDemo((list) => onList(VC.normalizeViewerList(list, listOpts)));
@@ -86,6 +97,33 @@
         hideBroadcaster: cfg.hideBroadcaster
       }, onList);
       sync.start();
+      if (cfg.showChatBubbles !== false) {
+        connection.subscriptions.Twitch.push('ChatMessage', 'ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut');
+        connection.on('event', event => {
+          if (event.source !== 'Twitch') return;
+          if (event.type === 'ChatMessage') {
+            bubbleStats.received++;
+            const message = VC.normalizeChatMessage(event.data);
+            if (!message) { bubbleStats.invalid++; VC.log.debug('Bubble skipped: unrecognized chat payload'); return; }
+            const key = message.login;
+            const actor = audience.actors.get(key);
+            if (ignoredChat.has(key) || (cfg.hideBroadcaster && message.isBroadcaster) || (actor && actor.isLeaving())) {
+              bubbleStats.ignored++; return;
+            }
+            if (actor && actor.isInside()) bubbleStats.matched++;
+            else bubbleStats.waiting++;
+            renderer.showBubble(key, message.text);
+            // Keep a recent message while the authoritative presence list catches up.
+            if (!actor && Date.now() - lastChatRefresh >= 1000) {
+              lastChatRefresh = Date.now(); sync.refreshSoon('chat author');
+            }
+            VC.log.debug('Chat bubbles:', Object.assign({}, bubbleStats));
+          } else if (['ChatMessageDeleted', 'ChatCleared', 'UserBanned', 'UserTimedOut'].includes(event.type)) {
+            renderer.clearBubbles();
+          }
+        });
+      }
+      if (screenScene) screenScene.connect(connection);
       connection.start();
     }
 
@@ -96,6 +134,7 @@
       last = now;
       audience.update(dt);
       renderer.draw(audience, now / 1000, dt);
+      if (screenScene) screenScene.update(dt);
       raf = requestAnimationFrame(frame);
     };
     const begin = () => { last = performance.now(); raf = requestAnimationFrame(frame); };
@@ -113,6 +152,7 @@
     });
     window.addEventListener('pagehide', () => {
       session.save();
+      renderer.clearBubbles();
       clearInterval(saveTimer);
       cancelAnimationFrame(raf);
       if (sync) sync.stop();
@@ -131,7 +171,15 @@
 
     // Read-only handle for automated tests / console inspection (nothing is rendered).
     window.__cinema = {
-      config: cfg, audience, connection, renderer,
+      config: cfg, audience, connection, renderer, screenScene,
+      chatDiagnostics: () => Object.assign({}, bubbleStats, {
+        enabled: cfg.showChatBubbles !== false, demo: !!cfg.demo,
+        connection: connection ? connection.state : 'demo',
+        subscribed: connection ? connection.subscriptionAccepted : null,
+        shown: renderer.bubblesShown,
+        visible: renderer.bubbleLayer.querySelectorAll('.speech-bubble:not([hidden])').length,
+        pending: renderer.bubbles.size
+      }),
       snapshot: () => Object.assign(audience.snapshot(), { connection: connection ? connection.state : 'demo' })
     };
   }

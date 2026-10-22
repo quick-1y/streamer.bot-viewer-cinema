@@ -87,6 +87,9 @@
   };
 
   // All overlay geometry is measured in the unmodified room artwork.
+  // Painted screen interior: TL, TR, BR, BL in the displayed 1672×941 art.
+  // Its lower edge and height differ from the upper edge: use all four corners.
+  L.SCREEN_ART_CORNERS = [[960, 123], [1375, 343], [1375, 523], [960, 290]];
   L.artPoint = function (x, y) {
     return { x: 12 + (x * 936) / 1672, y: 6 + (y * 527) / 941 };
   };
