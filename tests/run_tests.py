@@ -73,7 +73,8 @@ def all_seated(s, n=None):
 
 
 def open_page(browser, port, **params):
-    q = {'port': port, 'poll': 0, 'grace': 2, 'debug': 0, 'initial': 'walk'}
+    # Pixel checks are calibrated on the classic artwork, whatever config.js selects.
+    q = {'theme': 'classic', 'port': port, 'poll': 0, 'grace': 2, 'debug': 0, 'initial': 'walk'}
     q.update(params)
     url = PAGE + '?' + '&'.join(f'{k}={v}' for k, v in q.items())
     pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
@@ -102,7 +103,7 @@ def main():
 
         # ---------------------------------------------------------------- crypto parity
         pg = browser.new_page()
-        pg.goto(PAGE + '?demo=1')
+        pg.goto(PAGE + '?theme=classic&demo=1')
         pg.wait_for_function('window.__cinema !== undefined')
         ok = True
         node_hash = subprocess.check_output(['node', '-e', "process.stdout.write(require('crypto').createHash('sha256').update('pässwörd+salt','utf8').digest('base64'))"]).decode()
@@ -113,7 +114,7 @@ def main():
 
         # ---------------------------------------------------------------- independent decor
         pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
-        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.goto(PAGE + '?theme=classic&demo=1&remember=0')
         pg.wait_for_function('window.__cinema !== undefined')
         decor = pg.evaluate('''() => {
             const scene = __cinema.renderer.scene;
@@ -169,7 +170,7 @@ def main():
             ('long', 'LongChannelName' * 20, 'LongChannelName' * 20),
             ('empty', '', '')
         ]:
-            pg.goto(PAGE + '?demo=1&remember=0&sign=' + query)
+            pg.goto(PAGE + '?theme=classic&demo=1&remember=0&sign=' + query)
             pg.wait_for_function('window.__cinema !== undefined')
             fitted = pg.evaluate('''() => {
                 const s = __cinema.renderer.scene.sign;
@@ -184,7 +185,7 @@ def main():
 
         # ---------------------------------------------------------------- independent rug textures
         pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
-        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.goto(PAGE + '?theme=classic&demo=1&remember=0')
         pg.wait_for_function('window.__cinema !== undefined')
         rugs = pg.evaluate('''async () => {
             const render = () => {
@@ -225,7 +226,7 @@ def main():
             {'rug1': rugs['custom'], 'rug2': None}) + ';'
         pg.route('**/config.js', lambda route: route.fulfill(
             body=custom_config, content_type='text/javascript'))
-        pg.goto(PAGE + '?demo=1&remember=0')
+        pg.goto(PAGE + '?theme=classic&demo=1&remember=0')
         pg.wait_for_function('window.__cinema !== undefined')
         configured = pg.evaluate('''() => {
             const c=document.createElement('canvas');c.width=1920;c.height=1080;
@@ -471,7 +472,7 @@ def main():
         # Separate page context: deny storage to model restrictive CEF settings.
         pg = browser.new_page(viewport={'width': 1920, 'height': 1080})
         pg.add_init_script("Storage.prototype.getItem = Storage.prototype.setItem = function() { throw new DOMException('Denied', 'SecurityError'); }")
-        pg.goto(PAGE + '?port=18086&poll=0')
+        pg.goto(PAGE + '?theme=classic&port=18086&poll=0')
         pg.wait_for_function('window.__cinema !== undefined')
         good, s = wait_for(pg, lambda s: all_seated(s, 9), 8)
         check('14f. storage denial uses seated startup without replaying existing viewers', good)

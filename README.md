@@ -9,6 +9,8 @@
 
 ![Viewer Cinema](preview.png)
 
+![Viewer Cinema — тема cyberpunk](preview-cyberpunk.png)
+
 ## Быстрый запуск
 
 1. Скачайте проект целиком и распакуйте в отдельную папку.
@@ -50,6 +52,7 @@
 |---|---|---|
 | `host`, `port`, `endpoint`, `password` | те же имена | Подключение к Streamer.bot |
 | `secure` | `secure=1` | Защищённый WebSocket (`wss`) |
+| `cinemaTheme` | `theme=classic` / `cyberpunk` | Оформление зала |
 | `background` | `bg=dark` / `transparent` / цвет | Фон вокруг зала |
 | `signText` | `sign=` | Надпись на вывеске |
 | `maxSeats` | `seats=` | Лимит мест, до 60 |
@@ -68,6 +71,18 @@
 | `showChatBubbles` | `bubbles=0` | Сообщения над персонажами |
 | `chatBubbleSeconds`, `chatBubbleMaxChars` | `bubbleSeconds=`, `bubbleChars=` | Время показа и длина сообщения |
 | `demo`, `debug` | `demo=1`, `debug=1` | Демо-аудитория и сообщения в консоли |
+
+### Темы оформления
+
+`cinemaTheme` в `config.js` выбирает оформление зала:
+
+- `classic` — деревянный зал с бархатными креслами (по умолчанию);
+- `cyberpunk` — неоновый зал: металлический пол с подсветкой, неоновые ковры и кресла.
+
+Тема меняет фон зала, кресла, ковры, ограждение, рамки постеров, вывеску, счётчик
+и облачка; планировка, места и маршруты зрителей одинаковы. Параметр `?theme=`
+работает на всех страницах, например `index.html?theme=cyberpunk&demo=1`.
+Неизвестное название включает `classic`.
 
 ### Постеры и ковры
 
@@ -89,7 +104,8 @@ posters: {
 
 Ковры задаются в `rugs.rug1` и `rugs.rug2`. Используйте обычные прямоугольные
 изображения без перспективы. `null` скрывает ковёр, неверный путь возвращает
-комплектную текстуру.
+комплектную текстуру. Комплектные ковры любой темы заменяются коврами выбранной темы,
+свои изображения показываются во всех темах.
 
 ## Чат и облачка
 
@@ -157,5 +173,5 @@ Streamer.bot: `chatMode: 'streamerbot'`, `chatUrl: ''`. История сооб�
 
 Сборка и зависимости для запуска оверлея не нужны. Для тестов требуются Node.js,
 Python 3 и Playwright с Chromium. Установка и команды — в [tests/README.md](tests/README.md).
-Карта графических ресурсов — в [assets/art/README.md](assets/art/README.md).
+Карта графических ресурсов — в [assets/README.md](assets/README.md).
 Inter включён по лицензии [SIL OFL](fonts/Inter-OFL.txt).

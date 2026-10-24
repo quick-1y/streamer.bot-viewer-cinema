@@ -336,11 +336,11 @@ def main():
                 a.advance(0.1, [], 1);
                 return Math.abs(a.walkClock-0.25)<1e-8;
             }"""))
-            page.route('**/assets/art/cinema-chair.png', lambda route: route.abort())
+            page.route('**/assets/themes/*/cinema-chair.png', lambda route: route.abort())
             page.goto(f'http://127.0.0.1:{server.server_port}/index.html?demo=1')
             page.wait_for_selector('#stage.startup-error')
             check('missing required artwork reports an error instead of drawing a legacy room', 'Не удалось загрузить' in page.locator('#stage').inner_text() and page.locator('canvas.world').count()==0)
-            page.unroute('**/assets/art/cinema-chair.png')
+            page.unroute('**/assets/themes/*/cinema-chair.png')
             check('no browser errors', not errors)
             shots = Path(os.environ.get('SHOTS', '/tmp/cinema-scenes'))
             shots.mkdir(parents=True, exist_ok=True)
