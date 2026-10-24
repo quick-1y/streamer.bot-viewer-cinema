@@ -6,10 +6,10 @@
   const THEMES = {
     classic: {
       art: {
-        alignedRoom: 'assets/art/cinema-room-aligned.png',
-        chair: 'assets/art/cinema-chair.png',
-        rug1: 'assets/art/rug-1.png',
-        rug2: 'assets/art/rug-2.png'
+        alignedRoom: 'assets/themes/classic/cinema-room.png',
+        chair: 'assets/themes/classic/cinema-chair.png',
+        rug1: 'assets/themes/classic/rug-1.png',
+        rug2: 'assets/themes/classic/rug-2.png'
       },
       lights: ['255,172,74'],
       lightAlpha: 0.035,
@@ -50,6 +50,8 @@
 
   VC.Theme = Object.assign({ id, names: Object.keys(THEMES) }, THEMES[id]);
   // Every bundled rug, so a config.js written for one theme follows the active one.
-  VC.Theme.bundledRugs = new Set(Object.values(THEMES).flatMap(t => [t.art.rug1, t.art.rug2]));
+  // The assets/art paths are where the classic rugs lived in older config.js files.
+  VC.Theme.bundledRugs = new Set(Object.values(THEMES).flatMap(t => [t.art.rug1, t.art.rug2])
+    .concat(['assets/art/rug-1.png', 'assets/art/rug-2.png']));
   document.documentElement.dataset.cinemaTheme = id;
 })();

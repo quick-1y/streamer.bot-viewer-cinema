@@ -173,5 +173,5 @@ Streamer.bot: `chatMode: 'streamerbot'`, `chatUrl: ''`. История сооб�
 
 Сборка и зависимости для запуска оверлея не нужны. Для тестов требуются Node.js,
 Python 3 и Playwright с Chromium. Установка и команды — в [tests/README.md](tests/README.md).
-Карта графических ресурсов — в [assets/art/README.md](assets/art/README.md).
+Карта графических ресурсов — в [assets/README.md](assets/README.md).
 Inter включён по лицензии [SIL OFL](fonts/Inter-OFL.txt).

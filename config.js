@@ -39,8 +39,8 @@ window.CINEMA_CONFIG = {
   // rug1 = ближе к экрану, rug2 = ближе ко входу. null скрывает ковёр.
   // Комплектные ковры (любой темы) автоматически меняются вместе с cinemaTheme.
   rugs: {
-    rug1: 'assets/art/rug-1.png',
-    rug2: 'assets/art/rug-2.png'
+    rug1: 'assets/themes/classic/rug-1.png',
+    rug2: 'assets/themes/classic/rug-2.png'
   },
   // Комплектные постеры слева направо; можно заменить своими PNG/JPG/SVG.
   // null, отсутствующая настройка или ошибка загрузки = пустая стена.

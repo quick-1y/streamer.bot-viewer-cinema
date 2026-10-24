@@ -9,10 +9,10 @@
     rug1: T.art.rug1,
     rug2: T.art.rug2,
     chair: T.art.chair,
-    viewers: 'assets/art/viewers.png',
-    viewersExtra: 'assets/art/viewers-extra.png',
-    viewersDiverse: 'assets/art/viewers-diverse.png',
-    viewersBack: 'assets/art/viewers-back.png'
+    viewers: 'assets/characters/viewers.png',
+    viewersExtra: 'assets/characters/viewers-extra.png',
+    viewersDiverse: 'assets/characters/viewers-diverse.png',
+    viewersBack: 'assets/characters/viewers-back.png'
   };
   A.ready = Promise.all(
     Object.entries(sources).map(
