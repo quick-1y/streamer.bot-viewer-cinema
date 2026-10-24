@@ -140,6 +140,31 @@ html, body {
   transform: translateX(-50%) rotate(45deg);
 }
 
+/* Cyberpunk theme: same layout, neon palette for the HTML widgets. */
+[data-cinema-theme="cyberpunk"] .counter {
+  color: #d9faff;
+  background: linear-gradient(#15172d, #090f20);
+  border-color: #39dfed;
+  box-shadow: 0 0 0 calc(3px * var(--u)) #112b41,
+    inset 0 0 0 calc(2px * var(--u)) #38214c,
+    0 0 calc(18px * var(--u)) #23cbe555;
+}
+[data-cinema-theme="cyberpunk"] .counter .value { color: #b8faff; }
+[data-cinema-theme="cyberpunk"] .counter.bump .value { animation-name: neon-bump; }
+@keyframes neon-bump {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.22); color: #ff92dc; }
+}
+[data-cinema-theme="cyberpunk"] .speech-bubble {
+  background: #101a2a; color: #effcff; border-color: #47b6cb;
+  box-shadow: 0 2px 8px #020817cc;
+}
+[data-cinema-theme="cyberpunk"] .speech-bubble::after {
+  background: #101a2a; border-color: #47b6cb;
+}
+[data-cinema-theme="cyberpunk"] .chat-line strong,
+[data-cinema-theme="cyberpunk"] .credits-group h2 { color: #6ff3ff; }
+
 .startup-error {
   display: grid; place-items: center; box-sizing: border-box; padding: 32px;
   color: #f5f5f5; background: #191519;

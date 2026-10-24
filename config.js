@@ -28,6 +28,8 @@ window.CINEMA_CONFIG = {
   ],
 
   // ---- Look ----
+  // Оформление зала: 'classic' (дерево и бархат) или 'cyberpunk' (неон).
+  cinemaTheme: 'cyberpunk',   // ?theme=classic | cyberpunk
   background: 'dark',       // ?bg=dark | transparent | #rrggbb
   maxSeats: 60,             // ?seats= cap (layout has 60 seats)
   showCounter: true,        // ?counter=0 hides "Зрители"
@@ -35,6 +37,7 @@ window.CINEMA_CONFIG = {
   signText: 'EreinTV',        // ?sign= название на вывеске; длинный текст автоматически уменьшается
   // Ковры: обычные прямоугольные изображения сверху, без перспективы.
   // rug1 = ближе к экрану, rug2 = ближе ко входу. null скрывает ковёр.
+  // Комплектные ковры (любой темы) автоматически меняются вместе с cinemaTheme.
   rugs: {
     rug1: 'assets/art/rug-1.png',
     rug2: 'assets/art/rug-2.png'

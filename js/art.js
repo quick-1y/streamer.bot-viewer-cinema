@@ -3,11 +3,12 @@
   'use strict';
   const VC = window.VC;
   const A = (VC.Art = { images: {}, ready: null, error: null });
+  const T = VC.Theme;
   const sources = {
-    alignedRoom: 'assets/art/cinema-room-aligned.png',
-    rug1: 'assets/art/rug-1.png',
-    rug2: 'assets/art/rug-2.png',
-    chair: 'assets/art/cinema-chair.png',
+    alignedRoom: T.art.alignedRoom,
+    rug1: T.art.rug1,
+    rug2: T.art.rug2,
+    chair: T.art.chair,
     viewers: 'assets/art/viewers.png',
     viewersExtra: 'assets/art/viewers-extra.png',
     viewersDiverse: 'assets/art/viewers-diverse.png',
@@ -62,7 +63,7 @@
       const src = config && config[id];
       if (src === null) return null;
       const fallback = A.images[id];
-      if (typeof src !== 'string' || !src.trim() || src === sources[id]) return fallback;
+      if (typeof src !== 'string' || !src.trim() || T.bundledRugs.has(src)) return fallback;
       const image = new Image();
       try {
         await new Promise((resolve, reject) => {
@@ -160,11 +161,11 @@
       [197, 548],
       [390, 647],
       [517, 317]
-    ].map(([x, y]) => ({
+    ].map(([x, y], index) => ({
       ...F(x, y),
       r: 14,
-      col: '255,172,74',
-      a: 0.035
+      col: T.lights[index % T.lights.length],
+      a: T.lightAlpha
     }));
     return {
       bg,
@@ -179,7 +180,8 @@
     };
   };
   A.railings = function (ctx) {
-    const L = VC.Layout,
+    const C = T.rail,
+      L = VC.Layout,
       P = L.project;
     function shape(points, fill, stroke) {
       ctx.beginPath();
@@ -220,8 +222,8 @@
           [x + s, y + s, h],
           [x - s, y + s, h]
         ],
-        '#56311e',
-        '#251922'
+        C.front,
+        C.frontEdge
       );
       shape(
         [
@@ -230,8 +232,8 @@
           [x + s, y + s, h],
           [x + s, y - s, h]
         ],
-        '#301c16',
-        '#211820'
+        C.back,
+        C.backEdge
       );
       shape(
         [
@@ -240,12 +242,12 @@
           [x + s, y + s, h],
           [x - s, y + s, h]
         ],
-        '#bd8240',
-        '#6e4a32'
+        C.top,
+        C.topEdge
       );
-      line([x - s, y + s, 0.08], [x - s, y + s, h - 0.06], '#8c4b24');
+      line([x - s, y + s, 0.08], [x - s, y + s, h - 0.06], C.post);
       const p = P(x, y, h + 0.02);
-      ctx.fillStyle = '#ffe0a0';
+      ctx.fillStyle = C.lamp;
       ctx.fillRect(p.x - 0.5, p.y - 0.6, 1, 1.2);
     }
     for (const [start, end, axis] of [
@@ -264,10 +266,10 @@
             [b[0] + normal[0], b[1] + normal[1], z],
             [a[0] + normal[0], a[1] + normal[1], z]
           ],
-          z === h ? '#79401e' : '#3a2117',
-          '#251a21'
+          z === h ? C.upper : C.lower,
+          C.outline
         );
-        line([...a, z + 0.015], [...b, z + 0.015], z === h ? '#b56f33' : '#684021', 0.65);
+        line([...a, z + 0.015], [...b, z + 0.015], z === h ? C.upperLight : C.lowerLight, 0.65);
       }
       const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
       const sections = Math.ceil(length / 1.65);
